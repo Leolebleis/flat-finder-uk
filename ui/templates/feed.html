@@ -60,10 +60,10 @@
                 <span class="meta-badge">{{ l.property_type }}</span>
                 {% endif %}
                 {% if l.distance_mi is not none %}
-                <span class="meta-badge">{{ l.distance_mi }} mi</span>
+                <span class="meta-badge meta-badge--distance">{{ l.distance_mi }} mi from stn</span>
                 {% endif %}
                 {% if l.commute_mins is not none %}
-                <span class="meta-badge meta-badge--commute">{{ l.commute_mins }} min</span>
+                <span class="meta-badge meta-badge--commute">{{ l.commute_mins }} min commute</span>
                 {% endif %}
             </div>
 
