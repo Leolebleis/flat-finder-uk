@@ -4,11 +4,12 @@ import requests as http_requests
 from pathlib import Path
 from shared.models import init_db, get_connection, insert_listing, get_state, set_state
 from shared.config import (DB_PATH, API_BASE_URL, API_KEY,
-                           RIGHTMOVE_LOCATION_ID, SEARCH_RADIUS_MILES,
                            MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM,
-                           NTFY_TOPIC, GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+                           NTFY_TOPIC, GMAIL_ADDRESS, GMAIL_APP_PASSWORD,
+                           load_zones)
 from scraper.rightmove import fetch_rightmove
 from scraper.openrent import fetch_openrent
+from scraper.commute import get_commute_mins
 from scraper.notifier import (format_ntfy_message, format_email_html,
                                send_ntfy, send_email,
                                format_failure_message, format_recovery_message)
@@ -77,25 +78,45 @@ def run() -> None:
     init_db(DB_PATH)
     conn = get_connection(DB_PATH)
     first_run = is_first_run(conn)
+    zones = load_zones()
 
-    rm_listings, rm_error = _scrape_source(
-        "rightmove",
-        lambda: fetch_rightmove(RIGHTMOVE_LOCATION_ID, SEARCH_RADIUS_MILES,
-                                MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
-        conn,
-    )
-    or_listings, or_error = _scrape_source(
-        "openrent",
-        lambda: fetch_openrent("Finchley Road Station", SEARCH_RADIUS_MILES,
-                               MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
-        conn,
-    )
+    all_listings = []
+    seen_ids = set()
 
-    _handle_failure_state(conn, "rightmove", rm_error)
-    _handle_failure_state(conn, "openrent", or_error)
+    for zone in zones:
+        rm_listings, rm_error = _scrape_source(
+            f"rightmove/{zone['name']}",
+            lambda z=zone: fetch_rightmove(z["rightmove_id"], z["radius_miles"],
+                                           MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
+            conn,
+        )
+        or_listings, or_error = _scrape_source(
+            f"openrent/{zone['name']}",
+            lambda z=zone: fetch_openrent(z["openrent_term"], z["radius_miles"],
+                                          MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
+            conn,
+        )
 
-    all_listings = rm_listings + or_listings
+        _handle_failure_state(conn, f"rightmove/{zone['name']}", rm_error)
+        _handle_failure_state(conn, f"openrent/{zone['name']}", or_error)
+
+        for listing in rm_listings + or_listings:
+            if listing["id"] not in seen_ids:
+                listing["zone"] = zone["name"]
+                all_listings.append(listing)
+                seen_ids.add(listing["id"])
+
     new_listings = process_new_listings(conn, all_listings)
+
+    # Fetch commute time for new listings with coordinates
+    for listing in new_listings:
+        if listing.get("latitude") and listing.get("longitude"):
+            mins = get_commute_mins(listing["latitude"], listing["longitude"])
+            if mins is not None:
+                listing["commute_mins"] = mins
+                conn.execute("UPDATE listings SET commute_mins = ? WHERE id = ?",
+                             (mins, listing["id"]))
+                conn.commit()
 
     # Push all scraped listings to VPS API (dedup handled server-side)
     if all_listings:
@@ -106,7 +127,7 @@ def run() -> None:
         log.info(f"First run: found {len(all_listings)} existing listings")
         if NTFY_TOPIC:
             _notify_safe(send_ntfy, NTFY_TOPIC, "Flat Finder initialised",
-                         f"Found {len(all_listings)} existing listings. Future notifications for new ones only.")
+                         f"Found {len(all_listings)} existing listings across {len(zones)} zones.")
     elif new_listings:
         log.info(f"Found {len(new_listings)} new listings")
         if NTFY_TOPIC:
