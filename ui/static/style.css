@@ -334,6 +334,11 @@ a.filter-btn--active:hover {
   color: var(--text-secondary);
 }
 
+.card__date {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
 /* Metadata row */
 .card__meta {
   display: flex;

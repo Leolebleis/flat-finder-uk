@@ -62,6 +62,9 @@
             </div>
 
             <div class="card__address">{{ l.address or "Address not available" }}</div>
+            {% if l.listing_date or l.first_seen %}
+            <div class="card__date">Listed {{ (l.listing_date or l.first_seen)[:10] }}</div>
+            {% endif %}
 
             <div class="card__meta">
                 {% if l.bedrooms is not none %}
