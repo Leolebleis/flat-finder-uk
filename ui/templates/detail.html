@@ -73,6 +73,7 @@
               data-id="{{ listing.id }}"
               data-field="override_dishwasher"
               data-value="{{ listing.has_dishwasher }}"
+              data-original="{{ listing.original_dishwasher }}"
               title="Click to change">
             {{ "Dishwasher" if listing.has_dishwasher == 'yes' else ("No dishwasher" if listing.has_dishwasher == 'no' else "Dishwasher?") }}
         </span>
@@ -82,6 +83,7 @@
               data-id="{{ listing.id }}"
               data-field="override_washer"
               data-value="{{ listing.has_washer }}"
+              data-original="{{ listing.original_washer }}"
               title="Click to change">
             {{ "Washer" if listing.has_washer == 'yes' else ("No washer" if listing.has_washer == 'no' else "Washer?") }}
         </span>
@@ -91,6 +93,7 @@
               data-id="{{ listing.id }}"
               data-field="override_outdoor"
               data-value="{{ listing.has_outdoor }}"
+              data-original="{{ listing.original_outdoor }}"
               title="Click to change">
             {{ (listing.outdoor_type or "Outdoor") if listing.has_outdoor == 'yes' else ("No outdoor" if listing.has_outdoor == 'no' else "Outdoor?") }}
         </span>

@@ -213,18 +213,31 @@
       pill.addEventListener("click", async function () {
         var current = pill.dataset.value;
         var idx = PILL_CYCLE.indexOf(current);
-        var next = PILL_CYCLE[(idx + 1) % PILL_CYCLE.length];
         var field = pill.dataset.field;
         var id = pill.dataset.id;
 
-        var payload = {};
-        payload[field] = next;
-        var result = await updateState(id, payload);
-        if (!result) return;
-
-        pill.dataset.value = next;
-        pill.className = "feature-pill feature-pill--" + next + " feature-pill--overridden";
-        pill.textContent = PILL_LABELS[field][next];
+        // 4-state cycle: yes -> no -> unknown -> revert (clear override)
+        var isLastState = idx === PILL_CYCLE.length - 1;
+        if (isLastState) {
+          // Clear override, revert to scraped value
+          var payload = {};
+          payload[field] = null;
+          var result = await updateState(id, payload);
+          if (!result) return;
+          var original = pill.dataset.original;
+          pill.dataset.value = original;
+          pill.className = "feature-pill feature-pill--" + original;
+          pill.textContent = PILL_LABELS[field][original];
+        } else {
+          var next = PILL_CYCLE[idx + 1];
+          var payload = {};
+          payload[field] = next;
+          var result = await updateState(id, payload);
+          if (!result) return;
+          pill.dataset.value = next;
+          pill.className = "feature-pill feature-pill--" + next + " feature-pill--overridden";
+          pill.textContent = PILL_LABELS[field][next];
+        }
       });
     });
   }

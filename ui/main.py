@@ -212,6 +212,10 @@ def detail_page(listing_id: str, request: Request):
     listing["override_dishwasher"] = state_row["override_dishwasher"] if state_row else None
     listing["override_washer"] = state_row["override_washer"] if state_row else None
     listing["override_outdoor"] = state_row["override_outdoor"] if state_row else None
+    # Save original scraped values before applying overrides
+    listing["original_dishwasher"] = listing["has_dishwasher"]
+    listing["original_washer"] = listing["has_washer"]
+    listing["original_outdoor"] = listing["has_outdoor"]
     if listing.get("override_dishwasher"):
         listing["has_dishwasher"] = listing["override_dishwasher"]
     if listing.get("override_washer"):
@@ -300,7 +304,8 @@ def update_state(listing_id: str, body: StateUpdate):
 def api_listings():
     conn = get_connection(UI_DB_PATH)
     rows = conn.execute(
-        """SELECT l.*, us.seen, us.favourite, us.notes
+        """SELECT l.*, us.seen, us.favourite, us.notes,
+                  us.override_dishwasher, us.override_washer, us.override_outdoor
            FROM listings l
            LEFT JOIN user_state us ON l.id = us.listing_id
            ORDER BY l.first_seen DESC"""
@@ -312,5 +317,12 @@ def api_listings():
         # Normalize booleans from SQLite ints
         d["seen"] = bool(d["seen"]) if d["seen"] else False
         d["favourite"] = bool(d["favourite"]) if d["favourite"] else False
+        # Apply label overrides
+        if d.get("override_dishwasher"):
+            d["has_dishwasher"] = d["override_dishwasher"]
+        if d.get("override_washer"):
+            d["has_washer"] = d["override_washer"]
+        if d.get("override_outdoor"):
+            d["has_outdoor"] = d["override_outdoor"]
         result.append(d)
     return result
