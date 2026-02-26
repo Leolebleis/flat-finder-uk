@@ -34,6 +34,8 @@
   --distance-text: #5e35b1;
   --commute-bg: #e3f0ff;
   --commute-text: #0051a8;
+  --gym-bg: #fff3e0;
+  --gym-text: #e65100;
   --feature-no-bg: #ffecea;
   --feature-no-text: #c0392b;
   --feature-yes-bg: var(--green-bg);
@@ -61,6 +63,8 @@
     --distance-text: #b39ddb;
     --commute-bg: #1a2a40;
     --commute-text: #7db8f0;
+    --gym-bg: #3a2a1a;
+    --gym-text: #ffb74d;
     --feature-no-bg: #3a1a1a;
     --feature-no-text: #f08080;
     --feature-yes-bg: #1a3326;
@@ -330,6 +334,11 @@ a.filter-btn--active:hover {
 .meta-badge--commute {
   background: var(--commute-bg);
   color: var(--commute-text);
+}
+
+.meta-badge--gym {
+  background: var(--gym-bg);
+  color: var(--gym-text);
 }
 
 .card__furnishing {

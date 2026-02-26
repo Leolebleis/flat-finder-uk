@@ -235,6 +235,18 @@ def test_detail_page_returns_html():
         assert "text/html" in resp.headers["content-type"]
 
 
+def test_feed_page_shows_gym_distance():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        _seed_listing(db_path)
+        client = _make_app(db_path)
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "mi to gym" in resp.text
+
+
 def test_detail_page_404_for_missing():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)

@@ -59,6 +59,9 @@
         {% if listing.commute_mins is not none %}
         <span class="meta-badge meta-badge--commute">{{ listing.commute_mins }} min commute</span>
         {% endif %}
+        {% if listing.gym_distance_mi is not none %}
+        <span class="meta-badge meta-badge--gym">{{ listing.gym_distance_mi }} mi to gym</span>
+        {% endif %}
         {% if listing.zone %}
         <span class="meta-badge">{{ listing.zone }}</span>
         {% endif %}

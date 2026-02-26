@@ -65,6 +65,9 @@
                 {% if l.commute_mins is not none %}
                 <span class="meta-badge meta-badge--commute">{{ l.commute_mins }} min commute</span>
                 {% endif %}
+                {% if l.gym_distance_mi is not none %}
+                <span class="meta-badge meta-badge--gym">{{ l.gym_distance_mi }} mi to gym</span>
+                {% endif %}
             </div>
 
             {% if l.furnishing %}

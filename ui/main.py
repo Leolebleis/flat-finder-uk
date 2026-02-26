@@ -54,6 +54,10 @@ app = FastAPI(title="Flat Finder UI", root_path="/flat", lifespan=lifespan)
 STATION_LAT = 51.5472
 STATION_LNG = -0.1803
 
+# Anytime Fitness Swiss Cottage (Harben Parade, NW3)
+GYM_LAT = 51.5445
+GYM_LNG = -0.1762
+
 
 def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calculate distance in miles between two coordinates."""
@@ -120,6 +124,9 @@ def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
             ), 2)
         else:
             d["distance_mi"] = None
+        d["gym_distance_mi"] = round(_haversine_miles(
+            GYM_LAT, GYM_LNG, d["latitude"], d["longitude"]
+        ), 2) if d.get("latitude") and d.get("longitude") else None
         listings.append(d)
     zones = sorted(set(d.get("zone") or "Unknown" for d in listings))
     if zone != "all":
@@ -157,6 +164,12 @@ def detail_page(listing_id: str, request: Request):
     listing["seen"] = bool(state_row["seen"]) if state_row else False
     listing["favourite"] = bool(state_row["favourite"]) if state_row else False
     listing["notes"] = state_row["notes"] if state_row else None
+    if listing.get("latitude") and listing.get("longitude"):
+        listing["gym_distance_mi"] = round(_haversine_miles(
+            GYM_LAT, GYM_LNG, listing["latitude"], listing["longitude"]
+        ), 2)
+    else:
+        listing["gym_distance_mi"] = None
     return templates.TemplateResponse(request, "detail.html", {
         "listing": listing,
     })
