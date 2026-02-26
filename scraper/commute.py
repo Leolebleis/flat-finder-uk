@@ -3,8 +3,8 @@ import requests
 
 log = logging.getLogger("flat-finder")
 
-DESTINATION_LAT = 51.4875
-DESTINATION_LNG = -0.1827
+DESTINATION_LAT = 51.4869
+DESTINATION_LNG = -0.1832
 TFL_MODES = "tube,bus,overground,elizabeth-line,dlr,tram"
 
 def get_commute_mins(lat: float, lng: float) -> int | None:

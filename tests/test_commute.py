@@ -17,7 +17,7 @@ def test_get_commute_mins_returns_shortest():
     # Verify TfL API was called with correct params
     call_url = mock_get.call_args[0][0]
     assert "51.5472,-0.1803" in call_url
-    assert "51.4875,-0.1827" in call_url
+    assert "51.4869,-0.1832" in call_url
 
 def test_get_commute_mins_returns_none_on_error():
     with patch("scraper.commute.requests.get", side_effect=Exception("timeout")):
