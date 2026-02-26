@@ -135,10 +135,10 @@ templates = Jinja2Templates(directory=str(_ui_dir / "templates"))
 app.mount("/static", StaticFiles(directory=str(_ui_dir / "static")), name="static")
 
 
-# --- Template routes ---
+# --- Data helpers ---
 
-@app.get("/", response_class=HTMLResponse, name="feed_page")
-def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
+def _get_feed_data(sort: str, zone: str) -> dict:
+    """Build feed page context data."""
     if sort not in SORT_OPTIONS:
         sort = "newest"
     conn = get_connection(UI_DB_PATH)
@@ -164,7 +164,6 @@ def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
         d["gym_distance_mi"] = round(_haversine_miles(
             GYM_LAT, GYM_LNG, d["latitude"], d["longitude"]
         ), 2) if d.get("latitude") and d.get("longitude") else None
-        # Apply label overrides
         if d.get("override_dishwasher"):
             d["has_dishwasher"] = d["override_dishwasher"]
         if d.get("override_washer"):
@@ -177,22 +176,17 @@ def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
         listings = [l for l in listings if (l.get("zone") or "Unknown") == zone]
     _compute_scores(listings)
     listings = _sort_listings(listings, sort)
-    return templates.TemplateResponse(request, "feed.html", {
+    return {
         "listings": listings,
         "sort": sort,
         "sort_options": SORT_OPTIONS,
         "zones": zones,
         "zone": zone,
-    })
+    }
 
 
-@app.get("/map", response_class=HTMLResponse, name="map_page")
-def map_page(request: Request):
-    return templates.TemplateResponse(request, "map.html")
-
-
-@app.get("/listing/{listing_id}", response_class=HTMLResponse, name="detail_page")
-def detail_page(listing_id: str, request: Request):
+def _get_detail_data(listing_id: str) -> dict:
+    """Build detail page context data."""
     conn = get_connection(UI_DB_PATH)
     row = conn.execute(
         "SELECT * FROM listings WHERE id = ?", (listing_id,)
@@ -201,7 +195,6 @@ def detail_page(listing_id: str, request: Request):
         conn.close()
         raise HTTPException(status_code=404, detail="Listing not found")
     listing = dict(row)
-    # Attach user state if present
     state_row = conn.execute(
         "SELECT * FROM user_state WHERE listing_id = ?", (listing_id,)
     ).fetchone()
@@ -212,7 +205,6 @@ def detail_page(listing_id: str, request: Request):
     listing["override_dishwasher"] = state_row["override_dishwasher"] if state_row else None
     listing["override_washer"] = state_row["override_washer"] if state_row else None
     listing["override_outdoor"] = state_row["override_outdoor"] if state_row else None
-    # Save original scraped values before applying overrides
     listing["original_dishwasher"] = listing["has_dishwasher"]
     listing["original_washer"] = listing["has_washer"]
     listing["original_outdoor"] = listing["has_outdoor"]
@@ -228,9 +220,24 @@ def detail_page(listing_id: str, request: Request):
         ), 2)
     else:
         listing["gym_distance_mi"] = None
-    return templates.TemplateResponse(request, "detail.html", {
-        "listing": listing,
-    })
+    return {"listing": listing}
+
+
+# --- Template routes ---
+
+@app.get("/", response_class=HTMLResponse, name="feed_page")
+def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
+    return templates.TemplateResponse(request, "feed.html", _get_feed_data(sort, zone))
+
+
+@app.get("/map", response_class=HTMLResponse, name="map_page")
+def map_page(request: Request):
+    return templates.TemplateResponse(request, "map.html")
+
+
+@app.get("/listing/{listing_id}", response_class=HTMLResponse, name="detail_page")
+def detail_page(listing_id: str, request: Request):
+    return templates.TemplateResponse(request, "detail.html", _get_detail_data(listing_id))
 
 
 # --- API routes ---

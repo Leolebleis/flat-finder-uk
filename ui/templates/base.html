@@ -5,27 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Flat Finder{% endblock %}</title>
     <link rel="icon" type="image/png" href="/flat/static/favicon.png">
-    <link rel="stylesheet" href="/flat/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/flat/static/v2.css">
     {% block head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar">
-        <span class="navbar__brand">Flat Finder</span>
-        <ul class="navbar__links">
-            <li>
-                <a class="navbar__link {% if request.url.path == '/flat/' or request.url.path == '/flat' %}navbar__link--active{% endif %}"
+    <nav class="nav">
+        <div class="nav__inner">
+            <a class="nav__brand" href="{{ request.url_for('feed_page') }}">Flat Finder</a>
+            <div class="nav__links">
+                <a class="nav__link {% if '/listing' not in request.url.path %}nav__link--active{% endif %}"
                    href="{{ request.url_for('feed_page') }}">Feed</a>
-            </li>
-            <li>
-                <a class="navbar__link {% if '/map' in request.url.path %}navbar__link--active{% endif %}"
-                   href="{{ request.url_for('map_page') }}">Map</a>
-            </li>
-        </ul>
+                <a class="nav__link" href="{{ request.url_for('map_page') }}">Map</a>
+            </div>
+        </div>
     </nav>
-    <main class="container">
+    <main class="main">
         {% block content %}{% endblock %}
     </main>
-    <script src="/flat/static/app.js"></script>
+    <script src="/flat/static/v2.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

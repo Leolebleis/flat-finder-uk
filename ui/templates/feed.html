@@ -2,157 +2,159 @@
 {% block title %}Feed - Flat Finder{% endblock %}
 {% block content %}
 
-<div class="filter-bar">
-    <button class="filter-btn filter-btn--active" data-filter="all">All</button>
-    <button class="filter-btn" data-filter="unseen">Unseen</button>
-    <button class="filter-btn" data-filter="favourites">Favourites</button>
+<div class="toolbar">
+    <div class="toolbar__row">
+        <div class="seg-control">
+            <button class="seg-control__btn seg-control__btn--active" data-filter="all">All</button>
+            <button class="seg-control__btn" data-filter="unseen">Unseen</button>
+            <button class="seg-control__btn" data-filter="favourites">Favourites</button>
+        </div>
 
-    <span class="filter-separator"></span>
-    <a class="filter-btn {% if zone == 'all' %}filter-btn--active{% endif %}"
-       href="?sort={{ sort }}&zone=all">All Zones</a>
-    {% for z in zones %}
-    <a class="filter-btn {% if zone == z %}filter-btn--active{% endif %}"
-       href="?sort={{ sort }}&zone={{ z }}">{{ z }}</a>
-    {% endfor %}
+        <div class="toolbar__zones">
+            <a class="zone-pill {% if zone == 'all' %}zone-pill--active{% endif %}"
+               href="?sort={{ sort }}&zone=all">All zones</a>
+            {% for z in zones %}
+            <a class="zone-pill {% if zone == z %}zone-pill--active{% endif %}"
+               href="?sort={{ sort }}&zone={{ z }}">{{ z }}</a>
+            {% endfor %}
+        </div>
 
-    <select class="sort-select" onchange="window.location.href='?sort='+this.value+'&zone={{ zone }}'">
-        {% for key, label in sort_options.items() %}
-        <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
+        <select class="sort-select" onchange="window.location.href='?sort='+this.value+'&zone={{ zone }}'">
+            {% for key, label in sort_options.items() %}
+            <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
 
-    <div class="weight-sliders {% if sort != 'best_match' %}weight-sliders--hidden{% endif %}" id="weight-sliders">
-        <label class="weight-label">
-            Commute <input type="range" id="w-commute" min="0" max="100" value="50" class="weight-range">
-            <span id="w-commute-val">50%</span>
-        </label>
-        <label class="weight-label">
-            Gym <input type="range" id="w-gym" min="0" max="100" value="50" class="weight-range">
-            <span id="w-gym-val">50%</span>
-        </label>
+    <div class="toolbar__sliders {% if sort != 'best_match' %}toolbar__sliders--hidden{% endif %}" id="weight-sliders">
+        <div class="slider-group">
+            <label class="slider-label" for="w-commute">Commute</label>
+            <input type="range" id="w-commute" min="0" max="100" value="50" class="slider">
+            <span class="slider-val" id="w-commute-val">50%</span>
+        </div>
+        <div class="slider-group">
+            <label class="slider-label" for="w-gym">Gym</label>
+            <input type="range" id="w-gym" min="0" max="100" value="50" class="slider">
+            <span class="slider-val" id="w-gym-val">50%</span>
+        </div>
     </div>
 </div>
 
 {% if listings %}
-<div class="card-grid">
+<p class="listing-count">{{ listings | length }} listing{{ 's' if listings | length != 1 else '' }}</p>
+<div class="listing-grid">
     {% for l in listings %}
-    <div class="card {% if l.seen %}card--seen{% endif %}"
-         data-id="{{ l.id }}"
-         data-seen="{{ 'true' if l.seen else 'false' }}"
-         data-favourite="{{ 'true' if l.favourite else 'false' }}"
-         data-commute-mins="{{ l.commute_mins if l.commute_mins is not none else '' }}"
-         data-gym-distance="{{ l.gym_distance_mi if l.gym_distance_mi is not none else '' }}"
-         data-match-score="{{ l.match_score or 0 }}">
+    <article class="listing-card {% if l.seen %}listing-card--seen{% endif %}"
+             data-id="{{ l.id }}"
+             data-seen="{{ 'true' if l.seen else 'false' }}"
+             data-favourite="{{ 'true' if l.favourite else 'false' }}"
+             data-commute-mins="{{ l.commute_mins if l.commute_mins is not none else '' }}"
+             data-gym-distance="{{ l.gym_distance_mi if l.gym_distance_mi is not none else '' }}"
+             data-match-score="{{ l.match_score or 0 }}"
+             style="--reveal-i: {{ loop.index0 }}">
 
-        <div class="card__img-wrap">
+        <div class="listing-card__media">
             {% if l.image_url %}
-            <img class="card__img" src="{{ l.image_url }}" alt="{{ l.address or 'Listing photo' }}" loading="lazy">
+            <img class="listing-card__img" src="{{ l.image_url }}" alt="{{ l.address or 'Listing' }}" loading="lazy">
             {% else %}
-            <div class="card__img-placeholder">No image</div>
+            <div class="listing-card__no-img">No image</div>
+            {% endif %}
+
+            <button class="listing-card__fav {% if l.favourite %}listing-card__fav--active{% endif %}"
+                    data-action="toggle-fav"
+                    data-id="{{ l.id }}"
+                    data-favourite="{{ 'true' if l.favourite else 'false' }}"
+                    aria-label="Favourite">&#9733;</button>
+
+            {% if sort == 'best_match' and l.match_score is not none %}
+            <span class="listing-card__score metric--score">{{ l.match_score }}</span>
             {% endif %}
         </div>
 
-        <div class="card__body">
-            <div class="card__price">
-                {% if l.price_pcm %}
-                    &pound;{{ "{:,}".format(l.price_pcm) }}/mo
-                {% else %}
-                    Price TBC
-                {% endif %}
+        <div class="listing-card__body">
+            <div class="listing-card__header">
+                <span class="listing-card__price">
+                    {% if l.price_pcm %}&pound;{{ "{:,}".format(l.price_pcm) }}<small>/mo</small>{% else %}Price TBC{% endif %}
+                </span>
+                <button class="btn-seen {% if l.seen %}btn-seen--active{% endif %}"
+                        data-action="toggle-seen"
+                        data-id="{{ l.id }}"
+                        data-seen="{{ 'true' if l.seen else 'false' }}"
+                        aria-label="Mark seen"
+                        title="{{ 'Seen' if l.seen else 'Mark as seen' }}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
             </div>
 
-            <div class="card__address">{{ l.address or "Address not available" }}</div>
+            <a class="listing-card__address" href="{{ request.url_for('detail_page', listing_id=l.id) }}">{{ l.address or "Address not available" }}</a>
+
             {% if l.first_seen %}
-            <div class="card__date">Found {{ l.first_seen[:10].split('-') | reverse | join('/') }}</div>
+            <time class="listing-card__date">{{ l.first_seen[:10].split('-') | reverse | join('/') }}</time>
             {% endif %}
 
-            <div class="card__meta">
-                {% if l.bedrooms is not none %}
-                <span class="meta-badge">{{ l.bedrooms }} bed</span>
-                {% endif %}
-                {% if l.sqft %}
-                <span class="meta-badge">{{ l.sqft }} sqft</span>
-                {% endif %}
-                {% if l.property_type %}
-                <span class="meta-badge">{{ l.property_type }}</span>
-                {% endif %}
-                {% if l.distance_mi is not none %}
-                <span class="meta-badge meta-badge--distance">{{ l.distance_mi }} mi from stn</span>
-                {% endif %}
+            <div class="listing-card__specs">
+                {% if l.bedrooms is not none %}{{ l.bedrooms }} bed{% endif %}
+                {% if l.sqft %}{% if l.bedrooms is not none %} &middot; {% endif %}{{ (l.sqft * 0.0929) | round | int }} m&sup2;{% endif %}
+                {% if l.property_type %}{% if l.bedrooms is not none or l.sqft %} &middot; {% endif %}{{ l.property_type }}{% endif %}
+                {% if l.furnishing %}{% if l.bedrooms is not none or l.sqft or l.property_type %} &middot; {% endif %}{{ l.furnishing }}{% endif %}
+            </div>
+
+            <div class="listing-card__metrics">
                 {% if l.commute_mins is not none %}
-                <span class="meta-badge meta-badge--commute">{{ l.commute_mins }} min commute</span>
+                <span class="metric metric--commute">{{ l.commute_mins }} min commute</span>
                 {% endif %}
                 {% if l.gym_distance_mi is not none %}
-                <span class="meta-badge meta-badge--gym">{{ l.gym_distance_mi }} mi to gym</span>
+                <span class="metric metric--gym">{{ l.gym_distance_mi }} mi to gym</span>
                 {% endif %}
-                {% if sort == 'best_match' and l.match_score is not none %}
-                <span class="meta-badge meta-badge--score">{{ l.match_score }} score</span>
+                {% if l.distance_mi is not none %}
+                <span class="metric metric--station">{{ l.distance_mi }} mi from stn</span>
                 {% endif %}
             </div>
 
-            {% if l.furnishing %}
-            <div class="card__furnishing">{{ l.furnishing }}</div>
-            {% endif %}
-
-            <div class="card__features">
+            <div class="listing-card__features">
                 {% if l.has_dishwasher == 'yes' %}
-                <span class="feature-pill feature-pill--yes">Dishwasher</span>
+                <span class="pill pill--yes">Dishwasher</span>
                 {% elif l.has_dishwasher == 'no' %}
-                <span class="feature-pill feature-pill--no">No dishwasher</span>
+                <span class="pill pill--no">No dishwasher</span>
                 {% else %}
-                <span class="feature-pill feature-pill--unknown">Dishwasher?</span>
+                <span class="pill pill--unknown">Dishwasher?</span>
                 {% endif %}
 
                 {% if l.has_washer == 'yes' %}
-                <span class="feature-pill feature-pill--yes">Washer</span>
+                <span class="pill pill--yes">Washer</span>
                 {% elif l.has_washer == 'no' %}
-                <span class="feature-pill feature-pill--no">No washer</span>
+                <span class="pill pill--no">No washer</span>
                 {% else %}
-                <span class="feature-pill feature-pill--unknown">Washer?</span>
+                <span class="pill pill--unknown">Washer?</span>
                 {% endif %}
 
                 {% if l.has_outdoor == 'yes' %}
-                <span class="feature-pill feature-pill--yes">{{ l.outdoor_type or "Outdoor" }}</span>
+                <span class="pill pill--yes">{{ l.outdoor_type or "Outdoor" }}</span>
                 {% elif l.has_outdoor == 'no' %}
-                <span class="feature-pill feature-pill--no">No outdoor</span>
+                <span class="pill pill--no">No outdoor</span>
                 {% else %}
-                <span class="feature-pill feature-pill--unknown">Outdoor?</span>
+                <span class="pill pill--unknown">Outdoor?</span>
                 {% endif %}
             </div>
 
-            <div class="card__actions">
-                <button class="btn {% if l.seen %}btn--seen-active{% endif %}"
-                        data-action="toggle-seen"
-                        data-id="{{ l.id }}"
-                        data-seen="{{ 'true' if l.seen else 'false' }}">{{ "Seen" if l.seen else "Mark seen" }}</button>
-
-                <button class="btn--fav {% if l.favourite %}btn--fav--active{% endif %}"
-                        data-action="toggle-fav"
-                        data-id="{{ l.id }}"
-                        data-favourite="{{ 'true' if l.favourite else 'false' }}"
-                        title="Favourite">&#9733;</button>
-
-                <span class="card__links">
-                    <a href="{{ request.url_for('detail_page', listing_id=l.id) }}">Details</a>
-                    <a href="{{ l.url }}" target="_blank" rel="noopener">Source &#8599;</a>
-                </span>
+            <div class="listing-card__footer">
+                <a class="listing-card__detail-link" href="{{ request.url_for('detail_page', listing_id=l.id) }}">View details &rarr;</a>
+                <a class="listing-card__source-link" href="{{ l.url }}" target="_blank" rel="noopener">Source &nearr;</a>
             </div>
 
-            <div class="card__notes">
-                <textarea class="notes-textarea"
-                          data-action="save-notes"
-                          data-id="{{ l.id }}"
-                          placeholder="Add notes..."
-                          rows="2">{{ l.notes or "" }}</textarea>
-            </div>
+            <textarea class="listing-card__notes"
+                      data-action="save-notes"
+                      data-id="{{ l.id }}"
+                      placeholder="Notes..."
+                      rows="1">{{ l.notes or "" }}</textarea>
         </div>
-    </div>
+    </article>
     {% endfor %}
 </div>
 {% else %}
-<div class="empty-state">
-    <p class="empty-state__title">No listings yet</p>
-    <p>Listings will appear here once the scraper finds some flats.</p>
+<div class="empty">
+    <p class="empty__title">No listings yet</p>
+    <p class="empty__sub">Listings will appear here once the scraper finds some flats.</p>
 </div>
 {% endif %}
 

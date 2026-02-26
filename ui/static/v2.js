@@ -1,14 +1,14 @@
-/* Flat Finder - app.js */
+/* Flat Finder v2 - app.js */
 
 (function () {
   "use strict";
 
-  const API_BASE = "/flat/api";
+  var API_BASE = "/flat/api";
 
   // --- State API ---
 
   async function updateState(listingId, payload) {
-    const resp = await fetch(`${API_BASE}/state/${listingId}`, {
+    var resp = await fetch(API_BASE + "/state/" + listingId, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -23,28 +23,35 @@
   // --- Toggle Seen ---
 
   function initSeenButtons() {
-    document.querySelectorAll("[data-action='toggle-seen']").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-        const currentlySeen = btn.dataset.seen === "true";
-        const newSeen = !currentlySeen;
+    document.querySelectorAll("[data-action='toggle-seen']").forEach(function (btn) {
+      btn.addEventListener("click", async function () {
+        var id = btn.dataset.id;
+        var currentlySeen = btn.dataset.seen === "true";
+        var newSeen = !currentlySeen;
 
-        const result = await updateState(id, { seen: newSeen });
+        var result = await updateState(id, { seen: newSeen });
         if (!result) return;
 
         btn.dataset.seen = String(newSeen);
-        btn.classList.toggle("btn--seen-active", newSeen);
-        btn.textContent = newSeen ? "Seen" : "Mark seen";
+        btn.classList.toggle("btn-seen--active", newSeen);
+        btn.classList.toggle("btn-action--active", newSeen);
+
+        // Update button text on detail page
+        var textNode = btn.childNodes[btn.childNodes.length - 1];
+        if (textNode && textNode.nodeType === 3) {
+          textNode.textContent = newSeen ? " Seen" : " Mark seen";
+        }
+        btn.title = newSeen ? "Seen" : "Mark as seen";
 
         // Update card visual state
-        const card = btn.closest(".card");
+        var card = btn.closest(".listing-card");
         if (card) {
           card.dataset.seen = String(newSeen);
-          card.classList.toggle("card--seen", newSeen);
+          card.classList.toggle("listing-card--seen", newSeen);
         }
 
-        // Update detail page data attribute if on detail page
-        const detail = btn.closest("[data-listing-id]");
+        // Update detail page data attribute
+        var detail = btn.closest("[data-listing-id]");
         if (detail && !card) {
           detail.dataset.seen = String(newSeen);
         }
@@ -57,26 +64,36 @@
   // --- Toggle Favourite ---
 
   function initFavButtons() {
-    document.querySelectorAll("[data-action='toggle-fav']").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-        const currentlyFav = btn.dataset.favourite === "true";
-        const newFav = !currentlyFav;
+    document.querySelectorAll("[data-action='toggle-fav']").forEach(function (btn) {
+      btn.addEventListener("click", async function () {
+        var id = btn.dataset.id;
+        var currentlyFav = btn.dataset.favourite === "true";
+        var newFav = !currentlyFav;
 
-        const result = await updateState(id, { favourite: newFav });
+        var result = await updateState(id, { favourite: newFav });
         if (!result) return;
 
         btn.dataset.favourite = String(newFav);
-        btn.classList.toggle("btn--fav--active", newFav);
+
+        // Feed card fav button
+        btn.classList.toggle("listing-card__fav--active", newFav);
+        // Detail page fav button
+        btn.classList.toggle("btn-action--fav-active", newFav);
+
+        // Update button text on detail page
+        var textNode = btn.childNodes[btn.childNodes.length - 1];
+        if (textNode && textNode.nodeType === 3) {
+          textNode.textContent = newFav ? " Saved" : " Save";
+        }
 
         // Update card data attribute
-        const card = btn.closest(".card");
+        var card = btn.closest(".listing-card");
         if (card) {
           card.dataset.favourite = String(newFav);
         }
 
-        // Update detail page data attribute if on detail page
-        const detail = btn.closest("[data-listing-id]");
+        // Update detail page data attribute
+        var detail = btn.closest("[data-listing-id]");
         if (detail && !card) {
           detail.dataset.favourite = String(newFav);
         }
@@ -89,10 +106,10 @@
   // --- Notes auto-save ---
 
   function initNotes() {
-    document.querySelectorAll("[data-action='save-notes']").forEach((textarea) => {
-      textarea.addEventListener("blur", async () => {
-        const id = textarea.dataset.id;
-        const notes = textarea.value;
+    document.querySelectorAll("[data-action='save-notes']").forEach(function (textarea) {
+      textarea.addEventListener("blur", async function () {
+        var id = textarea.dataset.id;
+        var notes = textarea.value;
         await updateState(id, { notes: notes });
       });
     });
@@ -100,13 +117,13 @@
 
   // --- Filter buttons ---
 
-  let currentFilter = "all";
+  var currentFilter = "all";
 
   function applyCurrentFilter() {
-    document.querySelectorAll(".card").forEach((card) => {
-      const seen = card.dataset.seen === "true";
-      const fav = card.dataset.favourite === "true";
-      let show = true;
+    document.querySelectorAll(".listing-card").forEach(function (card) {
+      var seen = card.dataset.seen === "true";
+      var fav = card.dataset.favourite === "true";
+      var show = true;
 
       if (currentFilter === "unseen") {
         show = !seen;
@@ -114,18 +131,17 @@
         show = fav;
       }
 
-      card.classList.toggle("card--hidden", !show);
+      card.classList.toggle("listing-card--hidden", !show);
     });
   }
 
   function initFilters() {
-    document.querySelectorAll("[data-filter]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        // Update active button
-        document.querySelectorAll("[data-filter]").forEach((b) => {
-          b.classList.remove("filter-btn--active");
+    document.querySelectorAll("[data-filter]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll("[data-filter]").forEach(function (b) {
+          b.classList.remove("seg-control__btn--active");
         });
-        btn.classList.add("filter-btn--active");
+        btn.classList.add("seg-control__btn--active");
 
         currentFilter = btn.dataset.filter;
         applyCurrentFilter();
@@ -160,7 +176,7 @@
   }
 
   function recalcScores(wCommute, wGym) {
-    var cards = Array.from(document.querySelectorAll(".card[data-commute-mins]"));
+    var cards = Array.from(document.querySelectorAll(".listing-card[data-commute-mins]"));
     var commutes = [];
     var gyms = [];
 
@@ -185,12 +201,12 @@
       var gScore = gd !== "" ? 100 * (1 - (parseFloat(gd) - gMin) / gRange) : 0;
       var score = Math.round(wCommute * cScore + wGym * gScore);
       c.dataset.matchScore = score;
-      var badge = c.querySelector(".meta-badge--score");
-      if (badge) badge.textContent = score + " score";
+      var badge = c.querySelector(".metric--score");
+      if (badge) badge.textContent = score;
     });
 
     // Re-sort cards in DOM
-    var grid = document.querySelector(".card-grid");
+    var grid = document.querySelector(".listing-grid");
     if (!grid) return;
     cards.sort(function (a, b) {
       return parseInt(b.dataset.matchScore, 10) - parseInt(a.dataset.matchScore, 10);
@@ -209,7 +225,6 @@
 
   function initPillCycling() {
     document.querySelectorAll("[data-action='cycle-pill']").forEach(function (pill) {
-      pill.style.cursor = "pointer";
       pill.addEventListener("click", async function () {
         var current = pill.dataset.value;
         var idx = PILL_CYCLE.indexOf(current);
@@ -226,7 +241,7 @@
           if (!result) return;
           var original = pill.dataset.original;
           pill.dataset.value = original;
-          pill.className = "feature-pill feature-pill--" + original;
+          pill.className = "pill pill--" + original;
           pill.textContent = PILL_LABELS[field][original];
         } else {
           var next = PILL_CYCLE[idx + 1];
@@ -235,7 +250,7 @@
           var result = await updateState(id, payload);
           if (!result) return;
           pill.dataset.value = next;
-          pill.className = "feature-pill feature-pill--" + next + " feature-pill--overridden";
+          pill.className = "pill pill--" + next + " pill--overridden";
           pill.textContent = PILL_LABELS[field][next];
         }
       });
@@ -244,7 +259,7 @@
 
   // --- Init ---
 
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", function () {
     initSeenButtons();
     initFavButtons();
     initNotes();

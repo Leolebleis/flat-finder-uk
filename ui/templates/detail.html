@@ -15,130 +15,136 @@
 
     <a class="detail__back" href="{{ request.url_for('feed_page') }}">&larr; Back to feed</a>
 
-    <div class="detail__img-wrap">
+    <div class="detail__hero">
         {% if listing.image_url %}
         <img class="detail__img" src="{{ listing.image_url }}" alt="{{ listing.address or 'Listing photo' }}">
         {% else %}
-        <div class="detail__img-placeholder">No image available</div>
+        <div class="detail__no-img">No image available</div>
         {% endif %}
     </div>
 
-    <div class="detail__price">
-        {% if listing.price_pcm %}
-            &pound;{{ "{:,}".format(listing.price_pcm) }}/mo
-        {% else %}
-            Price TBC
+    <div class="detail__content">
+        <div class="detail__top">
+            <div>
+                <span class="detail__price">
+                    {% if listing.price_pcm %}&pound;{{ "{:,}".format(listing.price_pcm) }}<small>/mo</small>{% else %}Price TBC{% endif %}
+                </span>
+                {% if listing.title %}
+                <h1 class="detail__title">{{ listing.title }}</h1>
+                {% endif %}
+                <p class="detail__address">{{ listing.address or "Address not available" }}</p>
+            </div>
+
+            <div class="detail__quick-actions">
+                <button class="btn-action {% if listing.seen %}btn-action--active{% endif %}"
+                        data-action="toggle-seen"
+                        data-id="{{ listing.id }}"
+                        data-seen="{{ 'true' if listing.seen else 'false' }}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    {{ "Seen" if listing.seen else "Mark seen" }}
+                </button>
+
+                <button class="btn-action btn-action--fav {% if listing.favourite %}btn-action--fav-active{% endif %}"
+                        data-action="toggle-fav"
+                        data-id="{{ listing.id }}"
+                        data-favourite="{{ 'true' if listing.favourite else 'false' }}">
+                    &#9733; {{ "Saved" if listing.favourite else "Save" }}
+                </button>
+
+                <a class="btn-action btn-action--primary" href="{{ listing.url }}" target="_blank" rel="noopener">
+                    View on {{ listing.source | capitalize }} &nearr;
+                </a>
+            </div>
+        </div>
+
+        <div class="detail__badges">
+            {% if listing.bedrooms is not none %}
+            <span class="metric">{{ listing.bedrooms }} bed</span>
+            {% endif %}
+            {% if listing.sqft %}
+            <span class="metric">{{ (listing.sqft * 0.0929) | round | int }} m&sup2;</span>
+            {% endif %}
+            {% if listing.property_type %}
+            <span class="metric">{{ listing.property_type }}</span>
+            {% endif %}
+            {% if listing.furnishing %}
+            <span class="metric">{{ listing.furnishing }}</span>
+            {% endif %}
+            {% if listing.source %}
+            <span class="metric">{{ listing.source | capitalize }}</span>
+            {% endif %}
+            {% if listing.listing_date %}
+            <span class="metric">Listed {{ listing.listing_date }}</span>
+            {% endif %}
+            {% if listing.commute_mins is not none %}
+            <span class="metric metric--commute">{{ listing.commute_mins }} min commute</span>
+            {% endif %}
+            {% if listing.gym_distance_mi is not none %}
+            <span class="metric metric--gym">{{ listing.gym_distance_mi }} mi to gym</span>
+            {% endif %}
+            {% if listing.zone %}
+            <span class="metric">{{ listing.zone }}</span>
+            {% endif %}
+        </div>
+
+        <div class="detail__features">
+            <h3 class="detail__label">Features <span class="detail__label-hint">(click to edit)</span></h3>
+            <div class="detail__pills">
+                <span class="pill pill--{{ 'yes' if listing.has_dishwasher == 'yes' else ('no' if listing.has_dishwasher == 'no' else 'unknown') }}{% if listing.override_dishwasher %} pill--overridden{% endif %}"
+                      data-action="cycle-pill"
+                      data-id="{{ listing.id }}"
+                      data-field="override_dishwasher"
+                      data-value="{{ listing.has_dishwasher }}"
+                      data-original="{{ listing.original_dishwasher }}"
+                      title="Click to change">
+                    {{ "Dishwasher" if listing.has_dishwasher == 'yes' else ("No dishwasher" if listing.has_dishwasher == 'no' else "Dishwasher?") }}
+                </span>
+
+                <span class="pill pill--{{ 'yes' if listing.has_washer == 'yes' else ('no' if listing.has_washer == 'no' else 'unknown') }}{% if listing.override_washer %} pill--overridden{% endif %}"
+                      data-action="cycle-pill"
+                      data-id="{{ listing.id }}"
+                      data-field="override_washer"
+                      data-value="{{ listing.has_washer }}"
+                      data-original="{{ listing.original_washer }}"
+                      title="Click to change">
+                    {{ "Washer" if listing.has_washer == 'yes' else ("No washer" if listing.has_washer == 'no' else "Washer?") }}
+                </span>
+
+                <span class="pill pill--{{ 'yes' if listing.has_outdoor == 'yes' else ('no' if listing.has_outdoor == 'no' else 'unknown') }}{% if listing.override_outdoor %} pill--overridden{% endif %}"
+                      data-action="cycle-pill"
+                      data-id="{{ listing.id }}"
+                      data-field="override_outdoor"
+                      data-value="{{ listing.has_outdoor }}"
+                      data-original="{{ listing.original_outdoor }}"
+                      title="Click to change">
+                    {{ (listing.outdoor_type or "Outdoor") if listing.has_outdoor == 'yes' else ("No outdoor" if listing.has_outdoor == 'no' else "Outdoor?") }}
+                </span>
+            </div>
+        </div>
+
+        <div class="detail__notes">
+            <h3 class="detail__label">Notes</h3>
+            <textarea class="notes-input"
+                      data-action="save-notes"
+                      data-id="{{ listing.id }}"
+                      placeholder="Add notes about this listing..."
+                      rows="3">{{ listing.notes or "" }}</textarea>
+        </div>
+
+        {% if listing.description %}
+        <div class="detail__description-section">
+            <h3 class="detail__label">Description</h3>
+            <div class="detail__description">{{ listing.description }}</div>
+        </div>
+        {% endif %}
+
+        {% if listing.latitude and listing.longitude %}
+        <div class="detail__map-section">
+            <h3 class="detail__label">Location</h3>
+            <div id="detail-map" class="detail__map"></div>
+        </div>
         {% endif %}
     </div>
-
-    {% if listing.title %}
-    <h1 class="detail__title">{{ listing.title }}</h1>
-    {% endif %}
-
-    <p class="detail__address">{{ listing.address or "Address not available" }}</p>
-
-    <div class="detail__meta">
-        {% if listing.bedrooms is not none %}
-        <span class="meta-badge">{{ listing.bedrooms }} bed</span>
-        {% endif %}
-        {% if listing.sqft %}
-        <span class="meta-badge">{{ listing.sqft }} sqft</span>
-        {% endif %}
-        {% if listing.property_type %}
-        <span class="meta-badge">{{ listing.property_type }}</span>
-        {% endif %}
-        {% if listing.furnishing %}
-        <span class="meta-badge">{{ listing.furnishing }}</span>
-        {% endif %}
-        {% if listing.source %}
-        <span class="meta-badge">{{ listing.source | capitalize }}</span>
-        {% endif %}
-        {% if listing.listing_date %}
-        <span class="meta-badge">Listed {{ listing.listing_date }}</span>
-        {% endif %}
-        {% if listing.commute_mins is not none %}
-        <span class="meta-badge meta-badge--commute">{{ listing.commute_mins }} min commute</span>
-        {% endif %}
-        {% if listing.gym_distance_mi is not none %}
-        <span class="meta-badge meta-badge--gym">{{ listing.gym_distance_mi }} mi to gym</span>
-        {% endif %}
-        {% if listing.zone %}
-        <span class="meta-badge">{{ listing.zone }}</span>
-        {% endif %}
-    </div>
-
-    <div class="detail__features">
-        <span class="feature-pill feature-pill--{{ 'yes' if listing.has_dishwasher == 'yes' else ('no' if listing.has_dishwasher == 'no' else 'unknown') }}{% if listing.override_dishwasher %} feature-pill--overridden{% endif %}"
-              data-action="cycle-pill"
-              data-id="{{ listing.id }}"
-              data-field="override_dishwasher"
-              data-value="{{ listing.has_dishwasher }}"
-              data-original="{{ listing.original_dishwasher }}"
-              title="Click to change">
-            {{ "Dishwasher" if listing.has_dishwasher == 'yes' else ("No dishwasher" if listing.has_dishwasher == 'no' else "Dishwasher?") }}
-        </span>
-
-        <span class="feature-pill feature-pill--{{ 'yes' if listing.has_washer == 'yes' else ('no' if listing.has_washer == 'no' else 'unknown') }}{% if listing.override_washer %} feature-pill--overridden{% endif %}"
-              data-action="cycle-pill"
-              data-id="{{ listing.id }}"
-              data-field="override_washer"
-              data-value="{{ listing.has_washer }}"
-              data-original="{{ listing.original_washer }}"
-              title="Click to change">
-            {{ "Washer" if listing.has_washer == 'yes' else ("No washer" if listing.has_washer == 'no' else "Washer?") }}
-        </span>
-
-        <span class="feature-pill feature-pill--{{ 'yes' if listing.has_outdoor == 'yes' else ('no' if listing.has_outdoor == 'no' else 'unknown') }}{% if listing.override_outdoor %} feature-pill--overridden{% endif %}"
-              data-action="cycle-pill"
-              data-id="{{ listing.id }}"
-              data-field="override_outdoor"
-              data-value="{{ listing.has_outdoor }}"
-              data-original="{{ listing.original_outdoor }}"
-              title="Click to change">
-            {{ (listing.outdoor_type or "Outdoor") if listing.has_outdoor == 'yes' else ("No outdoor" if listing.has_outdoor == 'no' else "Outdoor?") }}
-        </span>
-    </div>
-
-    <div class="detail__actions">
-        <button class="btn {% if listing.seen %}btn--seen-active{% endif %}"
-                data-action="toggle-seen"
-                data-id="{{ listing.id }}"
-                data-seen="{{ 'true' if listing.seen else 'false' }}">{{ "Seen" if listing.seen else "Mark seen" }}</button>
-
-        <button class="btn--fav {% if listing.favourite %}btn--fav--active{% endif %}"
-                data-action="toggle-fav"
-                data-id="{{ listing.id }}"
-                data-favourite="{{ 'true' if listing.favourite else 'false' }}"
-                title="Favourite">&#9733;</button>
-
-        <a class="detail__source-link" href="{{ listing.url }}" target="_blank" rel="noopener">
-            View on {{ listing.source | capitalize }} &#8599;
-        </a>
-    </div>
-
-    <div class="detail__notes">
-        <h3 class="detail__section-title">Notes</h3>
-        <textarea class="notes-textarea"
-                  data-action="save-notes"
-                  data-id="{{ listing.id }}"
-                  placeholder="Add notes about this listing..."
-                  rows="4">{{ listing.notes or "" }}</textarea>
-    </div>
-
-    {% if listing.description %}
-    <div>
-        <h3 class="detail__section-title">Description</h3>
-        <div class="detail__description">{{ listing.description }}</div>
-    </div>
-    {% endif %}
-
-    {% if listing.latitude and listing.longitude %}
-    <div>
-        <h3 class="detail__section-title">Location</h3>
-        <div id="detail-map" class="detail__map"></div>
-    </div>
-    {% endif %}
-
 </div>
 
 {% endblock %}
