@@ -159,3 +159,11 @@ def test_check_description_balcony_still_works():
     result = _check_description("Modern flat with balcony overlooking park")
     assert result["has_outdoor"] == "yes"
     assert "balcony" in result["outdoor_type"]
+
+def test_check_description_patio_substring_not_flagged():
+    result = _check_description("available for immediate occupation")
+    assert result["has_outdoor"] == "unknown"
+
+def test_check_description_terrace_substring_not_flagged():
+    result = _check_description("a characterful terraced house in NW6")
+    assert result["has_outdoor"] == "unknown"
