@@ -1,6 +1,7 @@
 # ui/main.py
 import asyncio
 import logging
+import math
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -62,6 +63,42 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(title="Flat Finder UI", root_path="/flat", lifespan=lifespan)
 
+# Finchley Road Station coordinates for distance calculation
+STATION_LAT = 51.5472
+STATION_LNG = -0.1803
+
+
+def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Calculate distance in miles between two coordinates."""
+    R = 3958.8  # Earth radius in miles
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+         math.sin(dlng / 2) ** 2)
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+SORT_OPTIONS = {
+    "newest": "Newest first",
+    "price_asc": "Price (low to high)",
+    "price_desc": "Price (high to low)",
+    "size_desc": "Size (largest)",
+    "distance": "Distance (nearest)",
+}
+
+
+def _sort_listings(listings: list[dict], sort: str) -> list[dict]:
+    if sort == "price_asc":
+        return sorted(listings, key=lambda l: (l["price_pcm"] is None, l["price_pcm"] or 0))
+    elif sort == "price_desc":
+        return sorted(listings, key=lambda l: (l["price_pcm"] is None, -(l["price_pcm"] or 0)))
+    elif sort == "size_desc":
+        return sorted(listings, key=lambda l: (l["sqft"] is None, -(l["sqft"] or 0)))
+    elif sort == "distance":
+        return sorted(listings, key=lambda l: (l["distance_mi"] is None, l["distance_mi"] or 999))
+    return listings  # newest - already sorted by first_seen DESC from SQL
+
 # Templates and static files
 _ui_dir = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(_ui_dir / "templates"))
@@ -71,14 +108,15 @@ app.mount("/static", StaticFiles(directory=str(_ui_dir / "static")), name="stati
 # --- Template routes ---
 
 @app.get("/", response_class=HTMLResponse, name="feed_page")
-def feed_page(request: Request):
+def feed_page(request: Request, sort: str = "newest"):
+    if sort not in SORT_OPTIONS:
+        sort = "newest"
     conn = get_connection(UI_DB_PATH)
     rows = conn.execute(
         """SELECT l.*, us.seen, us.favourite, us.notes
            FROM listings l
            LEFT JOIN user_state us ON l.id = us.listing_id
-           ORDER BY l.first_seen DESC
-           LIMIT 50"""
+           ORDER BY l.first_seen DESC"""
     ).fetchall()
     conn.close()
     listings = []
@@ -86,9 +124,18 @@ def feed_page(request: Request):
         d = dict(row)
         d["seen"] = bool(d["seen"]) if d["seen"] else False
         d["favourite"] = bool(d["favourite"]) if d["favourite"] else False
+        if d.get("latitude") and d.get("longitude"):
+            d["distance_mi"] = round(_haversine_miles(
+                STATION_LAT, STATION_LNG, d["latitude"], d["longitude"]
+            ), 2)
+        else:
+            d["distance_mi"] = None
         listings.append(d)
+    listings = _sort_listings(listings, sort)
     return templates.TemplateResponse(request, "feed.html", {
         "listings": listings,
+        "sort": sort,
+        "sort_options": SORT_OPTIONS,
     })
 
 

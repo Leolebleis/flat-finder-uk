@@ -6,6 +6,12 @@
     <button class="filter-btn filter-btn--active" data-filter="all">All</button>
     <button class="filter-btn" data-filter="unseen">Unseen</button>
     <button class="filter-btn" data-filter="favourites">Favourites</button>
+
+    <select class="sort-select" onchange="window.location.href='?sort='+this.value">
+        {% for key, label in sort_options.items() %}
+        <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
 </div>
 
 {% if listings %}
@@ -44,6 +50,9 @@
                 {% endif %}
                 {% if l.property_type %}
                 <span class="meta-badge">{{ l.property_type }}</span>
+                {% endif %}
+                {% if l.distance_mi is not none %}
+                <span class="meta-badge">{{ l.distance_mi }} mi</span>
                 {% endif %}
             </div>
 
