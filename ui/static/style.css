@@ -229,6 +229,31 @@ a.filter-btn--active:hover {
   padding-right: 2rem;
 }
 
+.weight-sliders {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-left: 0.5rem;
+}
+
+.weight-sliders--hidden {
+  display: none;
+}
+
+.weight-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.weight-range {
+  width: 80px;
+  cursor: pointer;
+}
+
 /* --- Card grid --- */
 .card-grid {
   display: grid;
@@ -649,6 +674,11 @@ a.filter-btn--active:hover {
   .sort-select {
     margin-left: 0;
     min-width: max-content;
+  }
+
+  .weight-sliders {
+    flex-basis: 100%;
+    margin-left: 0;
   }
 
   .detail__img-wrap {

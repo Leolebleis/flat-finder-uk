@@ -20,6 +20,17 @@
         <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
+
+    <div class="weight-sliders {% if sort != 'best_match' %}weight-sliders--hidden{% endif %}" id="weight-sliders">
+        <label class="weight-label">
+            Commute <input type="range" id="w-commute" min="0" max="100" value="50" class="weight-range">
+            <span id="w-commute-val">50%</span>
+        </label>
+        <label class="weight-label">
+            Gym <input type="range" id="w-gym" min="0" max="100" value="50" class="weight-range">
+            <span id="w-gym-val">50%</span>
+        </label>
+    </div>
 </div>
 
 {% if listings %}
@@ -28,7 +39,10 @@
     <div class="card {% if l.seen %}card--seen{% endif %}"
          data-id="{{ l.id }}"
          data-seen="{{ 'true' if l.seen else 'false' }}"
-         data-favourite="{{ 'true' if l.favourite else 'false' }}">
+         data-favourite="{{ 'true' if l.favourite else 'false' }}"
+         data-commute-mins="{{ l.commute_mins if l.commute_mins is not none else '' }}"
+         data-gym-distance="{{ l.gym_distance_mi if l.gym_distance_mi is not none else '' }}"
+         data-match-score="{{ l.match_score or 0 }}">
 
         <div class="card__img-wrap">
             {% if l.image_url %}

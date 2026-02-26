@@ -133,6 +133,71 @@
     });
   }
 
+  // --- Weight sliders & scoring ---
+
+  function initWeightSliders() {
+    var commuteSlider = document.getElementById("w-commute");
+    var gymSlider = document.getElementById("w-gym");
+    if (!commuteSlider || !gymSlider) return;
+
+    var commuteVal = document.getElementById("w-commute-val");
+    var gymVal = document.getElementById("w-gym-val");
+
+    function syncSliders(source) {
+      var v = parseInt(source.value, 10);
+      if (source === commuteSlider) {
+        gymSlider.value = 100 - v;
+      } else {
+        commuteSlider.value = 100 - v;
+      }
+      commuteVal.textContent = commuteSlider.value + "%";
+      gymVal.textContent = gymSlider.value + "%";
+      recalcScores(parseInt(commuteSlider.value, 10) / 100, parseInt(gymSlider.value, 10) / 100);
+    }
+
+    commuteSlider.addEventListener("input", function () { syncSliders(commuteSlider); });
+    gymSlider.addEventListener("input", function () { syncSliders(gymSlider); });
+  }
+
+  function recalcScores(wCommute, wGym) {
+    var cards = Array.from(document.querySelectorAll(".card[data-commute-mins]"));
+    var commutes = [];
+    var gyms = [];
+
+    cards.forEach(function (c) {
+      var cm = c.dataset.commuteMins;
+      var gd = c.dataset.gymDistance;
+      if (cm !== "") commutes.push(parseFloat(cm));
+      if (gd !== "") gyms.push(parseFloat(gd));
+    });
+
+    if (commutes.length === 0 && gyms.length === 0) return;
+
+    var cMin = Math.min.apply(null, commutes), cMax = Math.max.apply(null, commutes);
+    var gMin = Math.min.apply(null, gyms), gMax = Math.max.apply(null, gyms);
+    var cRange = cMax !== cMin ? cMax - cMin : 1;
+    var gRange = gMax !== gMin ? gMax - gMin : 1;
+
+    cards.forEach(function (c) {
+      var cm = c.dataset.commuteMins;
+      var gd = c.dataset.gymDistance;
+      var cScore = cm !== "" ? 100 * (1 - (parseFloat(cm) - cMin) / cRange) : 0;
+      var gScore = gd !== "" ? 100 * (1 - (parseFloat(gd) - gMin) / gRange) : 0;
+      var score = Math.round(wCommute * cScore + wGym * gScore);
+      c.dataset.matchScore = score;
+      var badge = c.querySelector(".meta-badge--score");
+      if (badge) badge.textContent = score + " score";
+    });
+
+    // Re-sort cards in DOM
+    var grid = document.querySelector(".card-grid");
+    if (!grid) return;
+    cards.sort(function (a, b) {
+      return parseInt(b.dataset.matchScore, 10) - parseInt(a.dataset.matchScore, 10);
+    });
+    cards.forEach(function (c) { grid.appendChild(c); });
+  }
+
   // --- Init ---
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -140,5 +205,6 @@
     initFavButtons();
     initNotes();
     initFilters();
+    initWeightSliders();
   });
 })();
