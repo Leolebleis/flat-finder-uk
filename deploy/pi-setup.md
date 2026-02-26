@@ -6,7 +6,7 @@
 - Mediastack running at `/opt/mediastack/`
 - Nginx in the mediastack docker-compose
 
-## 1. Add flat-finder service to docker-compose.yml
+## 1. Add flat-finder services to docker-compose.yml
 
 Add to `/opt/mediastack/docker-compose.yml`:
 
@@ -25,15 +25,39 @@ Add to `/opt/mediastack/docker-compose.yml`:
       - FLAT_FINDER_API_KEY=${FLAT_FINDER_API_KEY}
     networks:
       - mediastack
+
+  flat-finder-scraper:
+    build:
+      context: /home/leo/Documents/code/disqt.com/flat-finder
+      dockerfile: scraper/Dockerfile
+    container_name: flat-finder-scraper
+    restart: unless-stopped
+    volumes:
+      - flat-finder-scraper-data:/app/data
+    environment:
+      - FLAT_FINDER_DB=/app/data/scraper.db
+      - FLAT_FINDER_API_URL=https://disqt.com/flat/api
+      - FLAT_FINDER_API_KEY=${FLAT_FINDER_API_KEY}
+      - NTFY_TOPIC=${FLAT_FINDER_NTFY_TOPIC:-}
+      - GMAIL_ADDRESS=${FLAT_FINDER_GMAIL_ADDRESS:-}
+      - GMAIL_APP_PASSWORD=${FLAT_FINDER_GMAIL_APP_PASSWORD:-}
+    networks:
+      - mediastack
 ```
 
 Add to the `volumes:` section:
 
 ```yaml
   flat-finder-data:
+  flat-finder-scraper-data:
 ```
 
-Add `FLAT_FINDER_API_KEY` to `/opt/mediastack/.env`.
+Add to `/opt/mediastack/.env`:
+
+```
+FLAT_FINDER_API_KEY=<your-api-key>
+FLAT_FINDER_NTFY_TOPIC=flat-finder
+```
 
 ## 2. Add nginx location
 
@@ -55,7 +79,7 @@ location /flat/ {
 
 ```bash
 cd /opt/mediastack
-docker compose up -d --build flat-finder
+docker compose up -d --build flat-finder flat-finder-scraper
 docker compose restart nginx
 ```
 
@@ -64,11 +88,12 @@ docker compose restart nginx
 ```bash
 curl http://raspberrypi/flat/
 docker logs flat-finder
+docker logs flat-finder-scraper
 ```
 
 ## 5. Rebuild after code changes
 
 ```bash
 cd /opt/mediastack
-docker compose up -d --build flat-finder
+docker compose up -d --build flat-finder flat-finder-scraper
 ```

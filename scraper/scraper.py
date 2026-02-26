@@ -1,8 +1,10 @@
 # scraper/scraper.py
 import logging
+import requests as http_requests
 from pathlib import Path
 from shared.models import init_db, get_connection, insert_listing, get_state, set_state
-from shared.config import (DB_PATH, RIGHTMOVE_LOCATION_ID, SEARCH_RADIUS_MILES,
+from shared.config import (DB_PATH, API_BASE_URL, API_KEY,
+                           RIGHTMOVE_LOCATION_ID, SEARCH_RADIUS_MILES,
                            MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM,
                            NTFY_TOPIC, GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
 from scraper.rightmove import fetch_rightmove
@@ -38,6 +40,23 @@ def _notify_safe(fn, *args, **kwargs) -> None:
         fn(*args, **kwargs)
     except Exception as e:
         log.error(f"Notification failed: {e}")
+
+def _push_to_api(listings: list[dict]) -> None:
+    """Push listings to the VPS API so it stays in sync."""
+    if not API_BASE_URL or not API_KEY:
+        return
+    try:
+        resp = http_requests.post(
+            f"{API_BASE_URL}/listings",
+            json=listings,
+            headers={"X-API-Key": API_KEY},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        log.info(f"Pushed {result['inserted']} new listings to VPS API")
+    except Exception as e:
+        log.error(f"Failed to push to VPS API: {e}")
 
 def _handle_failure_state(conn, source: str, error: str | None) -> None:
     state_key = f"{source}_failing"
@@ -77,6 +96,10 @@ def run() -> None:
 
     all_listings = rm_listings + or_listings
     new_listings = process_new_listings(conn, all_listings)
+
+    # Push all scraped listings to VPS API (dedup handled server-side)
+    if all_listings:
+        _push_to_api(all_listings)
 
     if first_run:
         set_state(conn, "initialised", "true")

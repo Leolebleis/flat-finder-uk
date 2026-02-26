@@ -2,9 +2,9 @@
 from contextlib import asynccontextmanager
 from datetime import date
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 
-from shared.models import init_db, get_connection, get_listings
+from shared.models import init_db, get_connection, get_listings, insert_listing
 from shared.config import DB_PATH, API_KEY
 
 
@@ -38,6 +38,20 @@ def get_listing(listing_id: str, x_api_key: str = Header(None)):
     if not row:
         raise HTTPException(status_code=404)
     return dict(row)
+
+@app.post("/listings")
+async def create_listings(request: Request, x_api_key: str = Header(None)):
+    _check_key(x_api_key)
+    listings = await request.json()
+    if not isinstance(listings, list):
+        raise HTTPException(status_code=400, detail="Expected a list of listings")
+    conn = get_connection(DB_PATH)
+    new_count = 0
+    for listing in listings:
+        if insert_listing(conn, listing):
+            new_count += 1
+    conn.close()
+    return {"inserted": new_count, "total": len(listings)}
 
 @app.get("/stats")
 def stats(x_api_key: str = Header(None)):

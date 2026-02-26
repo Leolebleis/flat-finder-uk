@@ -31,7 +31,7 @@ def build_search_url(location_id: str, radius: float, min_beds: int,
         "channel": "RENT",
         "index": index,
         "sortType": 6,  # newest listed
-        "propertyTypes": "flat,maisonette",
+        "propertyTypes": "flat",
         "furnishTypes": "furnished,partFurnished",
         "currencyCode": "GBP",
         "areaSizeUnit": "sqft",
