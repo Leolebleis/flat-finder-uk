@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS scraper_state (
 
 def init_db(db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute(LISTINGS_SCHEMA)
     conn.execute(SCRAPER_STATE_SCHEMA)
     # Migrate existing databases: add new columns if missing

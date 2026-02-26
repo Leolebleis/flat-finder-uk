@@ -6,11 +6,7 @@ def get_env(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
 
 # Paths
-DB_PATH = Path(get_env("FLAT_FINDER_DB", "/home/dev/projects/flat-finder/flat_finder.db"))
-
-# API
-API_KEY = get_env("FLAT_FINDER_API_KEY", "")
-API_BASE_URL = get_env("FLAT_FINDER_API_URL", "https://disqt.com/flat/api")
+DB_PATH = Path(get_env("FLAT_FINDER_DB", "/app/data/flat_finder.db"))
 
 # Notifications
 NTFY_TOPIC = get_env("NTFY_TOPIC", "")

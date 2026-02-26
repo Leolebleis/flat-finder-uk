@@ -2,7 +2,6 @@
 import tempfile
 import os
 from pathlib import Path
-from unittest.mock import patch
 from fastapi.testclient import TestClient
 from shared.models import init_db, get_connection, insert_listing
 
@@ -244,65 +243,3 @@ def test_detail_page_404_for_missing():
 
         resp = client.get("/listing/nonexistent")
         assert resp.status_code == 404
-
-
-# --- sync tests ---
-
-def test_sync_from_vps_inserts_listings():
-    """Test that sync_from_vps fetches from VPS API and inserts listings."""
-    with tempfile.NamedTemporaryFile(suffix=".db") as f:
-        db_path = Path(f.name)
-        _setup_db(db_path)
-
-        mock_response_data = [SAMPLE_LISTING]
-
-        with patch("ui.sync.requests.get") as mock_get:
-            mock_get.return_value.status_code = 200
-            mock_get.return_value.json.return_value = mock_response_data
-            mock_get.return_value.raise_for_status = lambda: None
-
-            from ui.sync import sync_from_vps
-            count = sync_from_vps(db_path)
-
-        assert count == 1
-
-        conn = get_connection(db_path)
-        rows = conn.execute("SELECT * FROM listings").fetchall()
-        conn.close()
-        assert len(rows) == 1
-        assert rows[0]["id"] == "rightmove_1"
-
-
-def test_sync_from_vps_skips_duplicates():
-    """Test that sync doesn't re-insert existing listings."""
-    with tempfile.NamedTemporaryFile(suffix=".db") as f:
-        db_path = Path(f.name)
-        _setup_db(db_path)
-        _seed_listing(db_path)
-
-        mock_response_data = [SAMPLE_LISTING]
-
-        with patch("ui.sync.requests.get") as mock_get:
-            mock_get.return_value.status_code = 200
-            mock_get.return_value.json.return_value = mock_response_data
-            mock_get.return_value.raise_for_status = lambda: None
-
-            from ui.sync import sync_from_vps
-            count = sync_from_vps(db_path)
-
-        assert count == 0
-
-
-def test_sync_from_vps_handles_error():
-    """Test that sync handles API errors gracefully."""
-    with tempfile.NamedTemporaryFile(suffix=".db") as f:
-        db_path = Path(f.name)
-        _setup_db(db_path)
-
-        with patch("ui.sync.requests.get") as mock_get:
-            mock_get.side_effect = ConnectionError("Network error")
-
-            from ui.sync import sync_from_vps
-            count = sync_from_vps(db_path)
-
-        assert count == 0

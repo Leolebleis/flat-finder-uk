@@ -1,5 +1,4 @@
 # ui/main.py
-import asyncio
 import logging
 import math
 import os
@@ -14,7 +13,6 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from shared.models import init_db, get_connection, get_listings
-from ui.sync import sync_from_vps
 
 log = logging.getLogger("flat-finder-ui")
 
@@ -44,21 +42,10 @@ def _init_user_state_table(db_path: Path) -> None:
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    """Initialize DB and start background sync on startup."""
+    """Initialize DB on startup."""
     init_db(UI_DB_PATH)
     _init_user_state_table(UI_DB_PATH)
-
-    async def _sync_loop():
-        while True:
-            try:
-                await asyncio.to_thread(sync_from_vps, UI_DB_PATH)
-            except Exception as e:
-                log.error(f"Background sync error: {e}")
-            await asyncio.sleep(300)
-
-    task = asyncio.create_task(_sync_loop())
     yield
-    task.cancel()
 
 
 app = FastAPI(title="Flat Finder UI", root_path="/flat", lifespan=lifespan)
