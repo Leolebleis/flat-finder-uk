@@ -68,6 +68,9 @@
                 {% if l.gym_distance_mi is not none %}
                 <span class="meta-badge meta-badge--gym">{{ l.gym_distance_mi }} mi to gym</span>
                 {% endif %}
+                {% if sort == 'best_match' and l.match_score is not none %}
+                <span class="meta-badge meta-badge--score">{{ l.match_score }} score</span>
+                {% endif %}
             </div>
 
             {% if l.furnishing %}

@@ -70,7 +70,32 @@ def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> floa
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+def _compute_scores(listings: list[dict], w_commute: float = 0.5, w_gym: float = 0.5) -> None:
+    """Compute weighted match scores in-place. Mutates each listing dict."""
+    commute_vals = [l["commute_mins"] for l in listings if l.get("commute_mins") is not None]
+    gym_vals = [l["gym_distance_mi"] for l in listings if l.get("gym_distance_mi") is not None]
+
+    c_min = c_max = c_range = 0
+    g_min = g_max = g_range = 0
+    if commute_vals:
+        c_min, c_max = min(commute_vals), max(commute_vals)
+        c_range = c_max - c_min if c_max != c_min else 1
+    if gym_vals:
+        g_min, g_max = min(gym_vals), max(gym_vals)
+        g_range = g_max - g_min if g_max != g_min else 1
+
+    for l in listings:
+        c_score = 0.0
+        g_score = 0.0
+        if l.get("commute_mins") is not None and commute_vals:
+            c_score = 100 * (1 - (l["commute_mins"] - c_min) / c_range)
+        if l.get("gym_distance_mi") is not None and gym_vals:
+            g_score = 100 * (1 - (l["gym_distance_mi"] - g_min) / g_range)
+        l["match_score"] = round(w_commute * c_score + w_gym * g_score)
+
+
 SORT_OPTIONS = {
+    "best_match": "Best match",
     "newest": "Newest first",
     "price_asc": "Price (low to high)",
     "price_desc": "Price (high to low)",
@@ -81,7 +106,9 @@ SORT_OPTIONS = {
 
 
 def _sort_listings(listings: list[dict], sort: str) -> list[dict]:
-    if sort == "price_asc":
+    if sort == "best_match":
+        return sorted(listings, key=lambda l: -(l.get("match_score") or 0))
+    elif sort == "price_asc":
         return sorted(listings, key=lambda l: (l["price_pcm"] is None, l["price_pcm"] or 0))
     elif sort == "price_desc":
         return sorted(listings, key=lambda l: (l["price_pcm"] is None, -(l["price_pcm"] or 0)))
@@ -131,6 +158,7 @@ def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
     zones = sorted(set(d.get("zone") or "Unknown" for d in listings))
     if zone != "all":
         listings = [l for l in listings if (l.get("zone") or "Unknown") == zone]
+    _compute_scores(listings)
     listings = _sort_listings(listings, sort)
     return templates.TemplateResponse(request, "feed.html", {
         "listings": listings,

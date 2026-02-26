@@ -247,6 +247,39 @@ def test_feed_page_shows_gym_distance():
         assert "mi to gym" in resp.text
 
 
+def test_feed_page_best_match_sort():
+    """Best match sort should return listings sorted by combined score."""
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        _seed_listing(db_path, {
+            **SAMPLE_LISTING, "id": "close_gym",
+            "latitude": 51.544, "longitude": -0.176,
+            "commute_mins": 60,
+        })
+        _seed_listing(db_path, {
+            **SAMPLE_LISTING, "id": "short_commute",
+            "latitude": 51.49, "longitude": -0.18,
+            "commute_mins": 30,
+        })
+        client = _make_app(db_path)
+
+        resp = client.get("/?sort=best_match")
+        assert resp.status_code == 200
+        assert "score" in resp.text.lower()
+
+
+def test_feed_page_best_match_sort_option_exists():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        client = _make_app(db_path)
+
+        resp = client.get("/")
+        assert "best_match" in resp.text
+        assert "Best match" in resp.text
+
+
 def test_detail_page_404_for_missing():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
