@@ -7,7 +7,15 @@ from urllib.parse import urlencode
 
 SEARCH_URL = "https://www.rightmove.co.uk/property-to-rent/find.html"
 EXCLUDE_TERMS = ["shared", "bedsit", "studio"]
-OUTDOOR_TERMS = {"garden": "garden", "balcony": "balcony", "terrace": "terrace", "patio": "patio", "outdoor": "outdoor space"}
+OUTDOOR_PATTERNS = {
+    r"\bgarden\b": "garden",
+    r"\bbalcony\b": "balcony",
+    r"\bterrace\b": "terrace",
+    r"\bpatio\b": "patio",
+    r"\boutdoor\b": "outdoor space",
+}
+OUTDOOR_EXCLUDE = re.compile(r"\b(communal|shared|residents)\s+garden", re.IGNORECASE)
+STREET_GARDENS = re.compile(r"\b\w+\s+gardens\b", re.IGNORECASE)
 APPLIANCE_PATTERNS = {
     "has_dishwasher": [r"dishwasher", r"dish washer", r"dish-washer"],
     "has_washer": [r"washing machine", r"washer[\s/-]?dryer", r"laundry"],
@@ -45,8 +53,11 @@ def _check_description(text: str) -> dict:
     for key, patterns in APPLIANCE_PATTERNS.items():
         result[key] = "yes" if any(re.search(p, text_lower) for p in patterns) else "unknown"
     outdoor_found = []
-    for term, label in OUTDOOR_TERMS.items():
-        if term in text_lower:
+    # Strip false positives before matching garden
+    text_filtered = OUTDOOR_EXCLUDE.sub("", text_lower)
+    text_filtered = STREET_GARDENS.sub("", text_filtered)
+    for pattern, label in OUTDOOR_PATTERNS.items():
+        if re.search(pattern, text_filtered):
             outdoor_found.append(label)
     result["has_outdoor"] = "yes" if outdoor_found else "unknown"
     result["outdoor_type"] = ", ".join(outdoor_found) if outdoor_found else None

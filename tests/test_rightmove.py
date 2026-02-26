@@ -1,4 +1,4 @@
-from scraper.rightmove import parse_rightmove_response, build_search_url, _extract_next_data
+from scraper.rightmove import parse_rightmove_response, build_search_url, _extract_next_data, _check_description
 
 def test_build_search_url_includes_parameters():
     url = build_search_url(
@@ -132,3 +132,30 @@ def test_extract_next_data_raises_on_missing():
     import pytest
     with pytest.raises(ValueError, match="Could not find __NEXT_DATA__"):
         _extract_next_data("<html><body>No data here</body></html>")
+
+def test_check_description_communal_garden_not_flagged():
+    result = _check_description("Lovely flat with communal garden and modern kitchen")
+    assert result["has_outdoor"] == "unknown"
+
+def test_check_description_shared_garden_not_flagged():
+    result = _check_description("1 bed flat with shared garden near station")
+    assert result["has_outdoor"] == "unknown"
+
+def test_check_description_street_name_gardens_not_flagged():
+    result = _check_description("Located on Maida Vale Gardens, close to shops")
+    assert result["has_outdoor"] == "unknown"
+
+def test_check_description_private_garden_flagged():
+    result = _check_description("Beautiful flat with private garden")
+    assert result["has_outdoor"] == "yes"
+    assert "garden" in result["outdoor_type"]
+
+def test_check_description_just_garden_flagged():
+    result = _check_description("Spacious flat with garden and parking")
+    assert result["has_outdoor"] == "yes"
+    assert "garden" in result["outdoor_type"]
+
+def test_check_description_balcony_still_works():
+    result = _check_description("Modern flat with balcony overlooking park")
+    assert result["has_outdoor"] == "yes"
+    assert "balcony" in result["outdoor_type"]
