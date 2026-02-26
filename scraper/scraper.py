@@ -1,6 +1,7 @@
 # scraper/scraper.py
 import logging
 import re
+import time
 from pathlib import Path
 from shared.models import init_db, get_connection, insert_listing, get_state, set_state
 from shared.config import (DB_PATH, MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM,
@@ -150,6 +151,7 @@ def run() -> None:
                 conn.execute("UPDATE listings SET gym_commute_mins = ? WHERE id = ?",
                              (gym_mins, row["id"]))
                 conn.commit()
+            time.sleep(0.5)  # Avoid TfL rate limiting
 
     if first_run:
         set_state(conn, "initialised", "true")
