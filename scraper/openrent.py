@@ -203,4 +203,11 @@ def fetch_openrent(location: str, radius_miles: int, min_beds: int,
     }
     resp = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
     resp.raise_for_status()
-    return parse_openrent_html(resp.text)
+    listings = parse_openrent_html(resp.text)
+    # OpenRent doesn't always enforce server-side filters after redirect,
+    # so enforce price and bedroom limits client-side
+    return [
+        l for l in listings
+        if (l.get("price_pcm") is None or l["price_pcm"] <= max_price)
+        and (l.get("bedrooms") is None or min_beds <= l["bedrooms"] <= max_beds)
+    ]
