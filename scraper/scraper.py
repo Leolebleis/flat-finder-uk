@@ -8,7 +8,7 @@ from shared.config import (DB_PATH, MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM,
                            load_zones)
 from scraper.rightmove import fetch_rightmove
 from scraper.openrent import fetch_openrent
-from scraper.commute import get_commute_mins
+from scraper.commute import get_commute_mins, get_gym_commute_mins
 from scraper.notifier import (format_ntfy_message, format_email_html,
                                send_ntfy, send_email,
                                format_failure_message, format_recovery_message)
@@ -121,7 +121,7 @@ def run() -> None:
 
     new_listings = process_new_listings(conn, all_listings)
 
-    # Fetch commute time for new listings with coordinates
+    # Fetch commute times for new listings with coordinates
     for listing in new_listings:
         if listing.get("latitude") and listing.get("longitude"):
             mins = get_commute_mins(listing["latitude"], listing["longitude"])
@@ -129,6 +129,26 @@ def run() -> None:
                 listing["commute_mins"] = mins
                 conn.execute("UPDATE listings SET commute_mins = ? WHERE id = ?",
                              (mins, listing["id"]))
+                conn.commit()
+            gym_mins = get_gym_commute_mins(listing["latitude"], listing["longitude"])
+            if gym_mins is not None:
+                listing["gym_commute_mins"] = gym_mins
+                conn.execute("UPDATE listings SET gym_commute_mins = ? WHERE id = ?",
+                             (gym_mins, listing["id"]))
+                conn.commit()
+
+    # Backfill gym commute for existing listings that don't have it yet
+    missing_gym = conn.execute(
+        "SELECT id, latitude, longitude FROM listings "
+        "WHERE gym_commute_mins IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL"
+    ).fetchall()
+    if missing_gym:
+        log.info(f"Backfilling gym commute for {len(missing_gym)} listings")
+        for row in missing_gym:
+            gym_mins = get_gym_commute_mins(row["latitude"], row["longitude"])
+            if gym_mins is not None:
+                conn.execute("UPDATE listings SET gym_commute_mins = ? WHERE id = ?",
+                             (gym_mins, row["id"]))
                 conn.commit()
 
     if first_run:

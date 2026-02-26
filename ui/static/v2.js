@@ -182,7 +182,7 @@
 
     cards.forEach(function (c) {
       var cm = c.dataset.commuteMins;
-      var gd = c.dataset.gymDistance;
+      var gd = c.dataset.gymCommute;
       if (cm !== "") commutes.push(parseFloat(cm));
       if (gd !== "") gyms.push(parseFloat(gd));
     });
@@ -196,7 +196,7 @@
 
     cards.forEach(function (c) {
       var cm = c.dataset.commuteMins;
-      var gd = c.dataset.gymDistance;
+      var gd = c.dataset.gymCommute;
       var cScore = cm !== "" ? 100 * (1 - (parseFloat(cm) - cMin) / cRange) : 0;
       var gScore = gd !== "" ? 100 * (1 - (parseFloat(gd) - gMin) / gRange) : 0;
       var score = Math.round(wCommute * cScore + wGym * gScore);

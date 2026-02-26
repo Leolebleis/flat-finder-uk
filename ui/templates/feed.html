@@ -26,7 +26,7 @@
         </select>
     </div>
 
-    <div class="toolbar__sliders {% if sort != 'best_match' %}toolbar__sliders--hidden{% endif %}" id="weight-sliders">
+    <div class="toolbar__sliders" id="weight-sliders">
         <div class="slider-group">
             <label class="slider-label" for="w-commute">Commute</label>
             <input type="range" id="w-commute" min="0" max="100" value="50" class="slider">
@@ -49,7 +49,7 @@
              data-seen="{{ 'true' if l.seen else 'false' }}"
              data-favourite="{{ 'true' if l.favourite else 'false' }}"
              data-commute-mins="{{ l.commute_mins if l.commute_mins is not none else '' }}"
-             data-gym-distance="{{ l.gym_distance_mi if l.gym_distance_mi is not none else '' }}"
+             data-gym-commute="{{ l.gym_commute_mins if l.gym_commute_mins is not none else '' }}"
              data-match-score="{{ l.match_score or 0 }}"
              style="--reveal-i: {{ loop.index0 }}">
 
@@ -66,7 +66,7 @@
                     data-favourite="{{ 'true' if l.favourite else 'false' }}"
                     aria-label="Favourite">&#9733;</button>
 
-            {% if sort == 'best_match' and l.match_score is not none %}
+            {% if l.match_score is not none %}
             <span class="listing-card__score metric--score">{{ l.match_score }}</span>
             {% endif %}
         </div>
@@ -103,8 +103,8 @@
                 {% if l.commute_mins is not none %}
                 <span class="metric metric--commute">{{ l.commute_mins }} min commute</span>
                 {% endif %}
-                {% if l.gym_distance_mi is not none %}
-                <span class="metric metric--gym">{{ l.gym_distance_mi }} mi to gym</span>
+                {% if l.gym_commute_mins is not none %}
+                <span class="metric metric--gym">{{ l.gym_commute_mins }} min to gym</span>
                 {% endif %}
                 {% if l.distance_mi is not none %}
                 <span class="metric metric--station">{{ l.distance_mi }} mi from stn</span>

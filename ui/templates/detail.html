@@ -79,8 +79,8 @@
             {% if listing.commute_mins is not none %}
             <span class="metric metric--commute">{{ listing.commute_mins }} min commute</span>
             {% endif %}
-            {% if listing.gym_distance_mi is not none %}
-            <span class="metric metric--gym">{{ listing.gym_distance_mi }} mi to gym</span>
+            {% if listing.gym_commute_mins is not none %}
+            <span class="metric metric--gym">{{ listing.gym_commute_mins }} min to gym</span>
             {% endif %}
             {% if listing.zone %}
             <span class="metric">{{ listing.zone }}</span>

@@ -50,9 +50,12 @@ def _setup_db(db_path: Path):
     conn.close()
 
 
-def _seed_listing(db_path: Path, listing: dict | None = None):
+def _seed_listing(db_path: Path, listing: dict | None = None, gym_commute_mins: int | None = None):
+    data = listing or dict(SAMPLE_LISTING)
+    if gym_commute_mins is not None:
+        data = {**data, "gym_commute_mins": gym_commute_mins}
     conn = get_connection(db_path)
-    insert_listing(conn, listing or SAMPLE_LISTING)
+    insert_listing(conn, data)
     conn.close()
 
 
@@ -238,16 +241,16 @@ def test_detail_page_returns_html():
         assert "text/html" in resp.headers["content-type"]
 
 
-def test_feed_page_shows_gym_distance():
+def test_feed_page_shows_gym_commute():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
         _setup_db(db_path)
-        _seed_listing(db_path)
+        _seed_listing(db_path, gym_commute_mins=12)
         client = _make_app(db_path)
 
         resp = client.get("/")
         assert resp.status_code == 200
-        assert "mi to gym" in resp.text
+        assert "min to gym" in resp.text
 
 
 def test_feed_page_best_match_sort():

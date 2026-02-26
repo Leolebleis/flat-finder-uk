@@ -63,11 +63,6 @@ app = FastAPI(title="Flat Finder UI", root_path="/flat", lifespan=lifespan)
 STATION_LAT = 51.5472
 STATION_LNG = -0.1803
 
-# Anytime Fitness Swiss Cottage (Harben Parade, NW3)
-GYM_LAT = 51.5445
-GYM_LNG = -0.1762
-
-
 def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calculate distance in miles between two coordinates."""
     R = 3958.8  # Earth radius in miles
@@ -82,7 +77,7 @@ def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> floa
 def _compute_scores(listings: list[dict], w_commute: float = 0.5, w_gym: float = 0.5) -> None:
     """Compute weighted match scores in-place. Mutates each listing dict."""
     commute_vals = [l["commute_mins"] for l in listings if l.get("commute_mins") is not None]
-    gym_vals = [l["gym_distance_mi"] for l in listings if l.get("gym_distance_mi") is not None]
+    gym_vals = [l["gym_commute_mins"] for l in listings if l.get("gym_commute_mins") is not None]
 
     c_min = c_max = c_range = 0
     g_min = g_max = g_range = 0
@@ -98,8 +93,8 @@ def _compute_scores(listings: list[dict], w_commute: float = 0.5, w_gym: float =
         g_score = 0.0
         if l.get("commute_mins") is not None and commute_vals:
             c_score = 100 * (1 - (l["commute_mins"] - c_min) / c_range)
-        if l.get("gym_distance_mi") is not None and gym_vals:
-            g_score = 100 * (1 - (l["gym_distance_mi"] - g_min) / g_range)
+        if l.get("gym_commute_mins") is not None and gym_vals:
+            g_score = 100 * (1 - (l["gym_commute_mins"] - g_min) / g_range)
         l["match_score"] = round(w_commute * c_score + w_gym * g_score)
 
 
@@ -161,9 +156,6 @@ def _get_feed_data(sort: str, zone: str) -> dict:
             ), 2)
         else:
             d["distance_mi"] = None
-        d["gym_distance_mi"] = round(_haversine_miles(
-            GYM_LAT, GYM_LNG, d["latitude"], d["longitude"]
-        ), 2) if d.get("latitude") and d.get("longitude") else None
         if d.get("override_dishwasher"):
             d["has_dishwasher"] = d["override_dishwasher"]
         if d.get("override_washer"):
@@ -214,12 +206,6 @@ def _get_detail_data(listing_id: str) -> dict:
         listing["has_washer"] = listing["override_washer"]
     if listing.get("override_outdoor"):
         listing["has_outdoor"] = listing["override_outdoor"]
-    if listing.get("latitude") and listing.get("longitude"):
-        listing["gym_distance_mi"] = round(_haversine_miles(
-            GYM_LAT, GYM_LNG, listing["latitude"], listing["longitude"]
-        ), 2)
-    else:
-        listing["gym_distance_mi"] = None
     return {"listing": listing}
 
 

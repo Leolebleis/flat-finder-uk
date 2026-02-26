@@ -56,9 +56,11 @@
 
     function buildPopup(listing) {
         var detailUrl = "/flat/listing/" + encodeURIComponent(listing.id);
-        var lines = [
-            "<strong>" + formatPrice(listing.price_pcm) + "</strong>",
-        ];
+        var lines = [];
+        if (listing.image_url) {
+            lines.push('<img src="' + esc(listing.image_url) + '" style="width:220px;height:140px;object-fit:cover;border-radius:4px;margin-bottom:6px;" alt="">');
+        }
+        lines.push("<strong>" + formatPrice(listing.price_pcm) + "</strong>");
         if (listing.address) {
             lines.push(esc(listing.address));
         }

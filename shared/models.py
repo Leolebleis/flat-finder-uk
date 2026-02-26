@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS listings (
     outdoor_type    TEXT,
     zone            TEXT,
     commute_mins    INTEGER,
+    gym_commute_mins INTEGER,
     first_seen      DATETIME NOT NULL,
     listing_date    TEXT
 );
@@ -41,7 +42,8 @@ def init_db(db_path: Path) -> None:
     conn.execute(LISTINGS_SCHEMA)
     conn.execute(SCRAPER_STATE_SCHEMA)
     # Migrate existing databases: add new columns if missing
-    for col, col_type in [("zone", "TEXT"), ("commute_mins", "INTEGER")]:
+    for col, col_type in [("zone", "TEXT"), ("commute_mins", "INTEGER"),
+                          ("gym_commute_mins", "INTEGER")]:
         try:
             conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {col_type}")
         except sqlite3.OperationalError:
@@ -58,16 +60,17 @@ def insert_listing(conn: sqlite3.Connection, listing: dict) -> bool:
     """Insert a listing. Returns True if new, False if already existed."""
     listing.setdefault("zone", None)
     listing.setdefault("commute_mins", None)
+    listing.setdefault("gym_commute_mins", None)
     try:
         conn.execute(
             """INSERT INTO listings (id, source, url, title, price_pcm, bedrooms,
                address, latitude, longitude, description, image_url, property_type,
                furnishing, sqft, has_dishwasher, has_washer, has_outdoor, outdoor_type,
-               zone, commute_mins, first_seen, listing_date)
+               zone, commute_mins, gym_commute_mins, first_seen, listing_date)
                VALUES (:id, :source, :url, :title, :price_pcm, :bedrooms,
                :address, :latitude, :longitude, :description, :image_url, :property_type,
                :furnishing, :sqft, :has_dishwasher, :has_washer, :has_outdoor, :outdoor_type,
-               :zone, :commute_mins, :first_seen, :listing_date)""",
+               :zone, :commute_mins, :gym_commute_mins, :first_seen, :listing_date)""",
             listing,
         )
         conn.commit()
