@@ -1,0 +1,10 @@
+[Unit]
+Description=Flat Finder Scraper
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=dev
+WorkingDirectory=/home/dev/projects/flat-finder
+EnvironmentFile=/home/dev/projects/flat-finder/.env
+ExecStart=/home/dev/projects/flat-finder/venv/bin/python -m scraper.scraper

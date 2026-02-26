@@ -1,0 +1,14 @@
+[Unit]
+Description=Flat Finder API
+After=network-online.target
+
+[Service]
+User=dev
+WorkingDirectory=/home/dev/projects/flat-finder
+EnvironmentFile=/home/dev/projects/flat-finder/.env
+ExecStart=/home/dev/projects/flat-finder/venv/bin/uvicorn api.main:app --host 127.0.0.1 --port 8090
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
