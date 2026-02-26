@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Flat Finder{% endblock %}</title>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav>
+        <a href="{{ request.url_for('feed_page') }}">Feed</a>
+        <a href="{{ request.url_for('map_page') }}">Map</a>
+    </nav>
+    {% block content %}{% endblock %}
+</body>
+</html>
