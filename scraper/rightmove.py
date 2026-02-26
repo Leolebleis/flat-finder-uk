@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 SEARCH_URL = "https://www.rightmove.co.uk/property-to-rent/find.html"
-EXCLUDE_TERMS = ["shared", "bedsit", "studio"]
+EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
 OUTDOOR_PATTERNS = {
     r"\bgarden\b": "garden",
     r"\bbalcony\b": "balcony",

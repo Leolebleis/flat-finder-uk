@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from scraper.rightmove import _check_description
 
 BASE_URL = "https://www.openrent.co.uk/properties-to-rent"
-EXCLUDE_TERMS = ["shared", "bedsit", "studio"]
+EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
 
 
 def build_search_url(location: str, radius_miles: int, min_beds: int,
