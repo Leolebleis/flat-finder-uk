@@ -1,6 +1,5 @@
 import sqlite3
 from pathlib import Path
-from datetime import datetime, timezone
 
 LISTINGS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
