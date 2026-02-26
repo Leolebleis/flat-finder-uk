@@ -33,6 +33,12 @@ def _scrape_source(name: str, fetch_fn, conn) -> tuple[list[dict], str | None]:
         error = str(e)
     return listings, error
 
+def _notify_safe(fn, *args, **kwargs) -> None:
+    try:
+        fn(*args, **kwargs)
+    except Exception as e:
+        log.error(f"Notification failed: {e}")
+
 def _handle_failure_state(conn, source: str, error: str | None) -> None:
     state_key = f"{source}_failing"
     was_failing = get_state(conn, state_key) is not None
@@ -40,13 +46,13 @@ def _handle_failure_state(conn, source: str, error: str | None) -> None:
         set_state(conn, state_key, error)
         if NTFY_TOPIC:
             title, body = format_failure_message(source, error)
-            send_ntfy(NTFY_TOPIC, title, body)
+            _notify_safe(send_ntfy, NTFY_TOPIC, title, body)
     elif not error and was_failing:
         conn.execute("DELETE FROM scraper_state WHERE key = ?", (state_key,))
         conn.commit()
         if NTFY_TOPIC:
             title, body = format_recovery_message(source)
-            send_ntfy(NTFY_TOPIC, title, body)
+            _notify_safe(send_ntfy, NTFY_TOPIC, title, body)
 
 def run() -> None:
     init_db(DB_PATH)
@@ -76,18 +82,18 @@ def run() -> None:
         set_state(conn, "initialised", "true")
         log.info(f"First run: found {len(all_listings)} existing listings")
         if NTFY_TOPIC:
-            send_ntfy(NTFY_TOPIC, "Flat Finder initialised",
-                      f"Found {len(all_listings)} existing listings. Future notifications for new ones only.")
+            _notify_safe(send_ntfy, NTFY_TOPIC, "Flat Finder initialised",
+                         f"Found {len(all_listings)} existing listings. Future notifications for new ones only.")
     elif new_listings:
         log.info(f"Found {len(new_listings)} new listings")
         if NTFY_TOPIC:
             title, body = format_ntfy_message(new_listings)
-            send_ntfy(NTFY_TOPIC, title, body)
+            _notify_safe(send_ntfy, NTFY_TOPIC, title, body)
         if GMAIL_ADDRESS and GMAIL_APP_PASSWORD:
             html = format_email_html(new_listings)
-            send_email(GMAIL_ADDRESS, GMAIL_APP_PASSWORD,
-                       f"Flat Finder: {len(new_listings)} new listing{'s' if len(new_listings) != 1 else ''}",
-                       html)
+            _notify_safe(send_email, GMAIL_ADDRESS, GMAIL_APP_PASSWORD,
+                         f"Flat Finder: {len(new_listings)} new listing{'s' if len(new_listings) != 1 else ''}",
+                         html)
     else:
         log.info("No new listings found")
 

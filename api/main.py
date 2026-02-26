@@ -1,14 +1,20 @@
 # api/main.py
-from fastapi import FastAPI, Header, HTTPException, Query
-from shared.models import init_db, get_connection, get_listings
-from shared.config import DB_PATH, API_KEY
+from contextlib import asynccontextmanager
 from datetime import date
 
-app = FastAPI(title="Flat Finder API", root_path="/flat/api")
+from fastapi import FastAPI, Header, HTTPException, Query
 
-@app.on_event("startup")
-def startup():
+from shared.models import init_db, get_connection, get_listings
+from shared.config import DB_PATH, API_KEY
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
     init_db(DB_PATH)
+    yield
+
+
+app = FastAPI(title="Flat Finder API", root_path="/flat/api", lifespan=lifespan)
 
 def _check_key(x_api_key: str = Header(None)):
     if not x_api_key or x_api_key != API_KEY:

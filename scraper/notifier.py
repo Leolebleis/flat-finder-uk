@@ -2,6 +2,7 @@ import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
 
 import requests
 
@@ -52,11 +53,11 @@ def format_email_html(listings: list[dict]) -> str:
     """
     rows = []
     for listing in listings:
-        url = listing.get("url", "#")
-        title = listing.get("title", "Listing")
+        url = escape(listing.get("url", "#"), quote=True)
+        title = escape(listing.get("title", "Listing"))
         price = listing.get("price_pcm")
         price_str = f"£{price:,}" if price is not None else "Price unknown"
-        address = listing.get("address", "")
+        address = escape(listing.get("address", ""))
 
         badges = []
         if listing.get("has_dishwasher") == "yes":

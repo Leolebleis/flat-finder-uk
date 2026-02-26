@@ -48,26 +48,32 @@
         return "\u00a3" + price.toLocaleString() + " pcm";
     }
 
+    function esc(str) {
+        var div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     function buildPopup(listing) {
         var detailUrl = "/flat/listing/" + encodeURIComponent(listing.id);
         var lines = [
             "<strong>" + formatPrice(listing.price_pcm) + "</strong>",
         ];
         if (listing.address) {
-            lines.push(listing.address);
+            lines.push(esc(listing.address));
         }
         if (listing.bedrooms != null) {
             lines.push(listing.bedrooms + " bed" + (listing.bedrooms !== 1 ? "s" : ""));
         }
         lines.push(
             '<a href="' + detailUrl + '">View detail</a>' +
-            ' &middot; <a href="' + listing.url + '" target="_blank" rel="noopener">Source</a>'
+            ' &middot; <a href="' + esc(listing.url) + '" target="_blank" rel="noopener">Source</a>'
         );
         return lines.join("<br>");
     }
 
     function shouldShow(listing) {
-        if (currentFilter === "unseen") return !listing.seen && !listing.favourite;
+        if (currentFilter === "unseen") return !listing.seen;
         if (currentFilter === "favourites") return listing.favourite;
         return true; // "all"
     }
