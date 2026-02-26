@@ -23,11 +23,14 @@ UI_DB_PATH = Path(os.environ.get(
 
 USER_STATE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS user_state (
-    listing_id TEXT PRIMARY KEY,
-    seen       BOOLEAN DEFAULT 0,
-    favourite  BOOLEAN DEFAULT 0,
-    notes      TEXT,
-    updated_at DATETIME
+    listing_id          TEXT PRIMARY KEY,
+    seen                BOOLEAN DEFAULT 0,
+    favourite           BOOLEAN DEFAULT 0,
+    notes               TEXT,
+    override_dishwasher TEXT,
+    override_washer     TEXT,
+    override_outdoor    TEXT,
+    updated_at          DATETIME
 );
 """
 
@@ -36,6 +39,12 @@ def _init_user_state_table(db_path: Path) -> None:
     """Create the user_state table if it doesn't exist."""
     conn = get_connection(db_path)
     conn.execute(USER_STATE_SCHEMA)
+    # Migrate existing databases: add override columns if missing
+    for col in ["override_dishwasher", "override_washer", "override_outdoor"]:
+        try:
+            conn.execute(f"ALTER TABLE user_state ADD COLUMN {col} TEXT")
+        except Exception:
+            pass
     conn.commit()
     conn.close()
 
@@ -134,7 +143,8 @@ def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
         sort = "newest"
     conn = get_connection(UI_DB_PATH)
     rows = conn.execute(
-        """SELECT l.*, us.seen, us.favourite, us.notes
+        """SELECT l.*, us.seen, us.favourite, us.notes,
+                  us.override_dishwasher, us.override_washer, us.override_outdoor
            FROM listings l
            LEFT JOIN user_state us ON l.id = us.listing_id
            ORDER BY l.first_seen DESC"""
@@ -154,6 +164,13 @@ def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
         d["gym_distance_mi"] = round(_haversine_miles(
             GYM_LAT, GYM_LNG, d["latitude"], d["longitude"]
         ), 2) if d.get("latitude") and d.get("longitude") else None
+        # Apply label overrides
+        if d.get("override_dishwasher"):
+            d["has_dishwasher"] = d["override_dishwasher"]
+        if d.get("override_washer"):
+            d["has_washer"] = d["override_washer"]
+        if d.get("override_outdoor"):
+            d["has_outdoor"] = d["override_outdoor"]
         listings.append(d)
     zones = sorted(set(d.get("zone") or "Unknown" for d in listings))
     if zone != "all":
@@ -192,6 +209,15 @@ def detail_page(listing_id: str, request: Request):
     listing["seen"] = bool(state_row["seen"]) if state_row else False
     listing["favourite"] = bool(state_row["favourite"]) if state_row else False
     listing["notes"] = state_row["notes"] if state_row else None
+    listing["override_dishwasher"] = state_row["override_dishwasher"] if state_row else None
+    listing["override_washer"] = state_row["override_washer"] if state_row else None
+    listing["override_outdoor"] = state_row["override_outdoor"] if state_row else None
+    if listing.get("override_dishwasher"):
+        listing["has_dishwasher"] = listing["override_dishwasher"]
+    if listing.get("override_washer"):
+        listing["has_washer"] = listing["override_washer"]
+    if listing.get("override_outdoor"):
+        listing["has_outdoor"] = listing["override_outdoor"]
     if listing.get("latitude") and listing.get("longitude"):
         listing["gym_distance_mi"] = round(_haversine_miles(
             GYM_LAT, GYM_LNG, listing["latitude"], listing["longitude"]
@@ -209,6 +235,9 @@ class StateUpdate(BaseModel):
     seen: bool | None = None
     favourite: bool | None = None
     notes: str | None = None
+    override_dishwasher: str | None = None
+    override_washer: str | None = None
+    override_outdoor: str | None = None
 
 
 @app.post("/api/state/{listing_id}")
@@ -230,13 +259,27 @@ def update_state(listing_id: str, body: StateUpdate):
     seen = body.seen if body.seen is not None else (bool(existing["seen"]) if existing else False)
     favourite = body.favourite if body.favourite is not None else (bool(existing["favourite"]) if existing else False)
     notes = body.notes if body.notes is not None else (existing["notes"] if existing else None)
+
+    # Override fields: use model_fields_set to distinguish "not sent" from "sent as null"
+    override_dishwasher = existing["override_dishwasher"] if existing else None
+    if "override_dishwasher" in body.model_fields_set:
+        override_dishwasher = body.override_dishwasher
+    override_washer = existing["override_washer"] if existing else None
+    if "override_washer" in body.model_fields_set:
+        override_washer = body.override_washer
+    override_outdoor = existing["override_outdoor"] if existing else None
+    if "override_outdoor" in body.model_fields_set:
+        override_outdoor = body.override_outdoor
+
     now = datetime.now(timezone.utc).isoformat()
 
     conn.execute(
         """INSERT OR REPLACE INTO user_state
-           (listing_id, seen, favourite, notes, updated_at)
-           VALUES (?, ?, ?, ?, ?)""",
-        (listing_id, int(seen), int(favourite), notes, now),
+           (listing_id, seen, favourite, notes,
+            override_dishwasher, override_washer, override_outdoor, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (listing_id, int(seen), int(favourite), notes,
+         override_dishwasher, override_washer, override_outdoor, now),
     )
     conn.commit()
     conn.close()
@@ -246,6 +289,9 @@ def update_state(listing_id: str, body: StateUpdate):
         "seen": seen,
         "favourite": favourite,
         "notes": notes,
+        "override_dishwasher": override_dishwasher,
+        "override_washer": override_washer,
+        "override_outdoor": override_outdoor,
         "updated_at": now,
     }
 

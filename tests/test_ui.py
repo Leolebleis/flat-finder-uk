@@ -8,11 +8,14 @@ from shared.models import init_db, get_connection, insert_listing
 
 USER_STATE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS user_state (
-    listing_id TEXT PRIMARY KEY,
-    seen       BOOLEAN DEFAULT 0,
-    favourite  BOOLEAN DEFAULT 0,
-    notes      TEXT,
-    updated_at DATETIME
+    listing_id          TEXT PRIMARY KEY,
+    seen                BOOLEAN DEFAULT 0,
+    favourite           BOOLEAN DEFAULT 0,
+    notes               TEXT,
+    override_dishwasher TEXT,
+    override_washer     TEXT,
+    override_outdoor    TEXT,
+    updated_at          DATETIME
 );
 """
 
@@ -288,3 +291,56 @@ def test_detail_page_404_for_missing():
 
         resp = client.get("/listing/nonexistent")
         assert resp.status_code == 404
+
+
+# --- Label override tests ---
+
+def test_update_state_override_dishwasher():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        _seed_listing(db_path)
+        client = _make_app(db_path)
+
+        resp = client.post("/api/state/rightmove_1", json={"override_dishwasher": "yes"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["override_dishwasher"] == "yes"
+
+        # Verify persisted
+        conn = get_connection(db_path)
+        row = conn.execute(
+            "SELECT override_dishwasher FROM user_state WHERE listing_id = ?",
+            ("rightmove_1",)
+        ).fetchone()
+        conn.close()
+        assert row["override_dishwasher"] == "yes"
+
+
+def test_update_state_override_clears_with_null():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        _seed_listing(db_path)
+        client = _make_app(db_path)
+
+        client.post("/api/state/rightmove_1", json={"override_dishwasher": "yes"})
+        resp = client.post("/api/state/rightmove_1", json={"override_dishwasher": None})
+        assert resp.status_code == 200
+        assert resp.json()["override_dishwasher"] is None
+
+
+def test_feed_page_applies_overrides():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        _seed_listing(db_path, {**SAMPLE_LISTING, "has_dishwasher": "no"})
+        client = _make_app(db_path)
+
+        # Override dishwasher to yes
+        client.post("/api/state/rightmove_1", json={"override_dishwasher": "yes"})
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "Dishwasher" in resp.text
+        assert "No dishwasher" not in resp.text
