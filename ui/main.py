@@ -73,8 +73,20 @@ app.mount("/static", StaticFiles(directory=str(_ui_dir / "static")), name="stati
 @app.get("/", response_class=HTMLResponse, name="feed_page")
 def feed_page(request: Request):
     conn = get_connection(UI_DB_PATH)
-    listings = get_listings(conn, limit=50)
+    rows = conn.execute(
+        """SELECT l.*, us.seen, us.favourite, us.notes
+           FROM listings l
+           LEFT JOIN user_state us ON l.id = us.listing_id
+           ORDER BY l.first_seen DESC
+           LIMIT 50"""
+    ).fetchall()
     conn.close()
+    listings = []
+    for row in rows:
+        d = dict(row)
+        d["seen"] = bool(d["seen"]) if d["seen"] else False
+        d["favourite"] = bool(d["favourite"]) if d["favourite"] else False
+        listings.append(d)
     return templates.TemplateResponse(request, "feed.html", {
         "listings": listings,
     })

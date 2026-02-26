@@ -1,6 +1,147 @@
 {% extends "base.html" %}
 {% block title %}{{ listing.title or "Listing" }} - Flat Finder{% endblock %}
+
+{% block head %}
+{% if listing.latitude and listing.longitude %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endif %}
+{% endblock %}
+
 {% block content %}
-<h1>{{ listing.title or "Listing Detail" }}</h1>
-<p>Coming soon</p>
+
+<div class="detail" data-listing-id="{{ listing.id }}"
+     data-seen="{{ 'true' if listing.seen else 'false' }}"
+     data-favourite="{{ 'true' if listing.favourite else 'false' }}">
+
+    <a class="detail__back" href="{{ request.url_for('feed_page') }}">&larr; Back to feed</a>
+
+    <div class="detail__img-wrap">
+        {% if listing.image_url %}
+        <img class="detail__img" src="{{ listing.image_url }}" alt="{{ listing.address or 'Listing photo' }}">
+        {% else %}
+        <div class="detail__img-placeholder">No image available</div>
+        {% endif %}
+    </div>
+
+    <div class="detail__price">
+        {% if listing.price_pcm %}
+            &pound;{{ "{:,}".format(listing.price_pcm) }}/mo
+        {% else %}
+            Price TBC
+        {% endif %}
+    </div>
+
+    {% if listing.title %}
+    <h1 class="detail__title">{{ listing.title }}</h1>
+    {% endif %}
+
+    <p class="detail__address">{{ listing.address or "Address not available" }}</p>
+
+    <div class="detail__meta">
+        {% if listing.bedrooms is not none %}
+        <span class="meta-badge">{{ listing.bedrooms }} bed</span>
+        {% endif %}
+        {% if listing.sqft %}
+        <span class="meta-badge">{{ listing.sqft }} sqft</span>
+        {% endif %}
+        {% if listing.property_type %}
+        <span class="meta-badge">{{ listing.property_type }}</span>
+        {% endif %}
+        {% if listing.furnishing %}
+        <span class="meta-badge">{{ listing.furnishing }}</span>
+        {% endif %}
+        {% if listing.source %}
+        <span class="meta-badge">{{ listing.source | capitalize }}</span>
+        {% endif %}
+        {% if listing.listing_date %}
+        <span class="meta-badge">Listed {{ listing.listing_date }}</span>
+        {% endif %}
+    </div>
+
+    <div class="detail__features">
+        {% if listing.has_dishwasher == 'yes' %}
+        <span class="feature-pill feature-pill--yes">Dishwasher</span>
+        {% elif listing.has_dishwasher == 'no' %}
+        <span class="feature-pill feature-pill--no">No dishwasher</span>
+        {% else %}
+        <span class="feature-pill feature-pill--unknown">Dishwasher?</span>
+        {% endif %}
+
+        {% if listing.has_washer == 'yes' %}
+        <span class="feature-pill feature-pill--yes">Washer</span>
+        {% elif listing.has_washer == 'no' %}
+        <span class="feature-pill feature-pill--no">No washer</span>
+        {% else %}
+        <span class="feature-pill feature-pill--unknown">Washer?</span>
+        {% endif %}
+
+        {% if listing.has_outdoor == 'yes' %}
+        <span class="feature-pill feature-pill--yes">{{ listing.outdoor_type or "Outdoor" }}</span>
+        {% elif listing.has_outdoor == 'no' %}
+        <span class="feature-pill feature-pill--no">No outdoor</span>
+        {% else %}
+        <span class="feature-pill feature-pill--unknown">Outdoor?</span>
+        {% endif %}
+    </div>
+
+    <div class="detail__actions">
+        <button class="btn {% if listing.seen %}btn--seen-active{% endif %}"
+                data-action="toggle-seen"
+                data-id="{{ listing.id }}"
+                data-seen="{{ 'true' if listing.seen else 'false' }}">{{ "Seen" if listing.seen else "Mark seen" }}</button>
+
+        <button class="btn--fav {% if listing.favourite %}btn--fav--active{% endif %}"
+                data-action="toggle-fav"
+                data-id="{{ listing.id }}"
+                data-favourite="{{ 'true' if listing.favourite else 'false' }}"
+                title="Favourite">&#9733;</button>
+
+        <a class="detail__source-link" href="{{ listing.url }}" target="_blank" rel="noopener">
+            View on {{ listing.source | capitalize }} &#8599;
+        </a>
+    </div>
+
+    <div class="detail__notes">
+        <h3 class="detail__section-title">Notes</h3>
+        <textarea class="notes-textarea"
+                  data-action="save-notes"
+                  data-id="{{ listing.id }}"
+                  placeholder="Add notes about this listing..."
+                  rows="4">{{ listing.notes or "" }}</textarea>
+    </div>
+
+    {% if listing.description %}
+    <div>
+        <h3 class="detail__section-title">Description</h3>
+        <div class="detail__description">{{ listing.description }}</div>
+    </div>
+    {% endif %}
+
+    {% if listing.latitude and listing.longitude %}
+    <div>
+        <h3 class="detail__section-title">Location</h3>
+        <div id="detail-map" class="detail__map"></div>
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if listing.latitude and listing.longitude %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+    var lat = {{ listing.latitude }};
+    var lng = {{ listing.longitude }};
+    var map = L.map("detail-map").setView([lat, lng], 15);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 19
+    }).addTo(map);
+    L.marker([lat, lng]).addTo(map);
+})();
+</script>
+{% endif %}
 {% endblock %}

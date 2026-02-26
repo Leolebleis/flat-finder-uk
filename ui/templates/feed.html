@@ -1,6 +1,116 @@
 {% extends "base.html" %}
 {% block title %}Feed - Flat Finder{% endblock %}
 {% block content %}
-<h1>Feed</h1>
-<p>Coming soon</p>
+
+<div class="filter-bar">
+    <button class="filter-btn filter-btn--active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="unseen">Unseen</button>
+    <button class="filter-btn" data-filter="favourites">Favourites</button>
+</div>
+
+{% if listings %}
+<div class="card-grid">
+    {% for l in listings %}
+    <div class="card {% if l.seen %}card--seen{% endif %}"
+         data-id="{{ l.id }}"
+         data-seen="{{ 'true' if l.seen else 'false' }}"
+         data-favourite="{{ 'true' if l.favourite else 'false' }}">
+
+        <div class="card__img-wrap">
+            {% if l.image_url %}
+            <img class="card__img" src="{{ l.image_url }}" alt="{{ l.address or 'Listing photo' }}" loading="lazy">
+            {% else %}
+            <div class="card__img-placeholder">No image</div>
+            {% endif %}
+        </div>
+
+        <div class="card__body">
+            <div class="card__price">
+                {% if l.price_pcm %}
+                    &pound;{{ "{:,}".format(l.price_pcm) }}/mo
+                {% else %}
+                    Price TBC
+                {% endif %}
+            </div>
+
+            <div class="card__address">{{ l.address or "Address not available" }}</div>
+
+            <div class="card__meta">
+                {% if l.bedrooms is not none %}
+                <span class="meta-badge">{{ l.bedrooms }} bed</span>
+                {% endif %}
+                {% if l.sqft %}
+                <span class="meta-badge">{{ l.sqft }} sqft</span>
+                {% endif %}
+                {% if l.property_type %}
+                <span class="meta-badge">{{ l.property_type }}</span>
+                {% endif %}
+            </div>
+
+            {% if l.furnishing %}
+            <div class="card__furnishing">{{ l.furnishing }}</div>
+            {% endif %}
+
+            <div class="card__features">
+                {% if l.has_dishwasher == 'yes' %}
+                <span class="feature-pill feature-pill--yes">Dishwasher</span>
+                {% elif l.has_dishwasher == 'no' %}
+                <span class="feature-pill feature-pill--no">No dishwasher</span>
+                {% else %}
+                <span class="feature-pill feature-pill--unknown">Dishwasher?</span>
+                {% endif %}
+
+                {% if l.has_washer == 'yes' %}
+                <span class="feature-pill feature-pill--yes">Washer</span>
+                {% elif l.has_washer == 'no' %}
+                <span class="feature-pill feature-pill--no">No washer</span>
+                {% else %}
+                <span class="feature-pill feature-pill--unknown">Washer?</span>
+                {% endif %}
+
+                {% if l.has_outdoor == 'yes' %}
+                <span class="feature-pill feature-pill--yes">{{ l.outdoor_type or "Outdoor" }}</span>
+                {% elif l.has_outdoor == 'no' %}
+                <span class="feature-pill feature-pill--no">No outdoor</span>
+                {% else %}
+                <span class="feature-pill feature-pill--unknown">Outdoor?</span>
+                {% endif %}
+            </div>
+
+            <div class="card__actions">
+                <button class="btn {% if l.seen %}btn--seen-active{% endif %}"
+                        data-action="toggle-seen"
+                        data-id="{{ l.id }}"
+                        data-seen="{{ 'true' if l.seen else 'false' }}">{{ "Seen" if l.seen else "Mark seen" }}</button>
+
+                <button class="btn--fav {% if l.favourite %}btn--fav--active{% endif %}"
+                        data-action="toggle-fav"
+                        data-id="{{ l.id }}"
+                        data-favourite="{{ 'true' if l.favourite else 'false' }}"
+                        title="Favourite">&#9733;</button>
+
+                <span class="card__links">
+                    <a href="{{ request.url_for('detail_page', listing_id=l.id) }}">Details</a>
+                    <a href="{{ l.url }}" target="_blank" rel="noopener">Source &#8599;</a>
+                </span>
+            </div>
+
+            <div class="card__notes">
+                <textarea class="notes-textarea"
+                          data-action="save-notes"
+                          data-id="{{ l.id }}"
+                          placeholder="Add notes..."
+                          rows="2">{{ l.notes or "" }}</textarea>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <p class="empty-state__title">No listings yet</p>
+    <p>Listings will appear here once the scraper finds some flats.</p>
+</div>
+{% endif %}
+
 {% endblock %}
