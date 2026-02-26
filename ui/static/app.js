@@ -198,6 +198,37 @@
     cards.forEach(function (c) { grid.appendChild(c); });
   }
 
+  // --- Clickable feature pills ---
+
+  var PILL_CYCLE = ["yes", "no", "unknown"];
+  var PILL_LABELS = {
+    override_dishwasher: { yes: "Dishwasher", no: "No dishwasher", unknown: "Dishwasher?" },
+    override_washer: { yes: "Washer", no: "No washer", unknown: "Washer?" },
+    override_outdoor: { yes: "Outdoor", no: "No outdoor", unknown: "Outdoor?" },
+  };
+
+  function initPillCycling() {
+    document.querySelectorAll("[data-action='cycle-pill']").forEach(function (pill) {
+      pill.style.cursor = "pointer";
+      pill.addEventListener("click", async function () {
+        var current = pill.dataset.value;
+        var idx = PILL_CYCLE.indexOf(current);
+        var next = PILL_CYCLE[(idx + 1) % PILL_CYCLE.length];
+        var field = pill.dataset.field;
+        var id = pill.dataset.id;
+
+        var payload = {};
+        payload[field] = next;
+        var result = await updateState(id, payload);
+        if (!result) return;
+
+        pill.dataset.value = next;
+        pill.className = "feature-pill feature-pill--" + next + " feature-pill--overridden";
+        pill.textContent = PILL_LABELS[field][next];
+      });
+    });
+  }
+
   // --- Init ---
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -206,5 +237,6 @@
     initNotes();
     initFilters();
     initWeightSliders();
+    initPillCycling();
   });
 })();

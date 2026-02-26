@@ -68,29 +68,32 @@
     </div>
 
     <div class="detail__features">
-        {% if listing.has_dishwasher == 'yes' %}
-        <span class="feature-pill feature-pill--yes">Dishwasher</span>
-        {% elif listing.has_dishwasher == 'no' %}
-        <span class="feature-pill feature-pill--no">No dishwasher</span>
-        {% else %}
-        <span class="feature-pill feature-pill--unknown">Dishwasher?</span>
-        {% endif %}
+        <span class="feature-pill feature-pill--{{ 'yes' if listing.has_dishwasher == 'yes' else ('no' if listing.has_dishwasher == 'no' else 'unknown') }}{% if listing.override_dishwasher %} feature-pill--overridden{% endif %}"
+              data-action="cycle-pill"
+              data-id="{{ listing.id }}"
+              data-field="override_dishwasher"
+              data-value="{{ listing.has_dishwasher }}"
+              title="Click to change">
+            {{ "Dishwasher" if listing.has_dishwasher == 'yes' else ("No dishwasher" if listing.has_dishwasher == 'no' else "Dishwasher?") }}
+        </span>
 
-        {% if listing.has_washer == 'yes' %}
-        <span class="feature-pill feature-pill--yes">Washer</span>
-        {% elif listing.has_washer == 'no' %}
-        <span class="feature-pill feature-pill--no">No washer</span>
-        {% else %}
-        <span class="feature-pill feature-pill--unknown">Washer?</span>
-        {% endif %}
+        <span class="feature-pill feature-pill--{{ 'yes' if listing.has_washer == 'yes' else ('no' if listing.has_washer == 'no' else 'unknown') }}{% if listing.override_washer %} feature-pill--overridden{% endif %}"
+              data-action="cycle-pill"
+              data-id="{{ listing.id }}"
+              data-field="override_washer"
+              data-value="{{ listing.has_washer }}"
+              title="Click to change">
+            {{ "Washer" if listing.has_washer == 'yes' else ("No washer" if listing.has_washer == 'no' else "Washer?") }}
+        </span>
 
-        {% if listing.has_outdoor == 'yes' %}
-        <span class="feature-pill feature-pill--yes">{{ listing.outdoor_type or "Outdoor" }}</span>
-        {% elif listing.has_outdoor == 'no' %}
-        <span class="feature-pill feature-pill--no">No outdoor</span>
-        {% else %}
-        <span class="feature-pill feature-pill--unknown">Outdoor?</span>
-        {% endif %}
+        <span class="feature-pill feature-pill--{{ 'yes' if listing.has_outdoor == 'yes' else ('no' if listing.has_outdoor == 'no' else 'unknown') }}{% if listing.override_outdoor %} feature-pill--overridden{% endif %}"
+              data-action="cycle-pill"
+              data-id="{{ listing.id }}"
+              data-field="override_outdoor"
+              data-value="{{ listing.has_outdoor }}"
+              title="Click to change">
+            {{ (listing.outdoor_type or "Outdoor") if listing.has_outdoor == 'yes' else ("No outdoor" if listing.has_outdoor == 'no' else "Outdoor?") }}
+        </span>
     </div>
 
     <div class="detail__actions">

@@ -411,6 +411,19 @@ a.filter-btn--active:hover {
   color: var(--feature-no-text);
 }
 
+.feature-pill--overridden {
+  border: 1.5px dashed var(--text-secondary);
+}
+
+[data-action="cycle-pill"] {
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+
+[data-action="cycle-pill"]:hover {
+  opacity: 0.75;
+}
+
 /* Card actions row */
 .card__actions {
   display: flex;
