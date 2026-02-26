@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -22,3 +23,21 @@ SEARCH_RADIUS_MILES = float(get_env("SEARCH_RADIUS_MILES", "1.0"))
 MAX_RENT_PCM = int(get_env("MAX_RENT_PCM", "2200"))
 MIN_BEDROOMS = int(get_env("MIN_BEDROOMS", "1"))
 MAX_BEDROOMS = int(get_env("MAX_BEDROOMS", "2"))
+
+# Zones
+ZONES_FILE = Path(get_env("ZONES_FILE", "/app/config/zones.json"))
+
+def load_zones(zones_file: Path | None = None) -> list[dict]:
+    path = zones_file or ZONES_FILE
+    if path.exists():
+        with open(path) as f:
+            return json.load(f)
+    # Fallback to legacy env vars
+    return [{
+        "name": "Default",
+        "rightmove_id": RIGHTMOVE_LOCATION_ID,
+        "openrent_term": "Finchley Road Station",
+        "radius_miles": SEARCH_RADIUS_MILES,
+        "lat": 51.5472,
+        "lng": -0.1803,
+    }]
