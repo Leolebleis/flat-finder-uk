@@ -3,14 +3,16 @@
 Property alert system. Design: `../../docs/plans/2026-02-26-flat-finder-design.md`
 
 ## Structure
-- `scraper/` + `api/` run on VPS (`/home/dev/projects/flat-finder/`)
-- `ui/` runs on Pi as Docker container in mediastack
-- `shared/` used by all components
+- Everything runs on Pi as Docker containers in mediastack
+- `scraper/` and `ui/` share the same SQLite DB via `flat-finder-data` volume
+- `shared/` used by both components
+- Zone config loaded from `/opt/mediastack/config/flat-finder/zones.json`
 
 ## Pi context
 See `../../raspberrypi/CLAUDE.md` and `../../raspberrypi/docs/pi-mediastack.md`
 
 ## Key commands
-- VPS: `ssh -i ~/.ssh/id_ed25519 -p 24420 dev@disqt.com`
-- Run scraper manually: `cd /home/dev/projects/flat-finder && python -m scraper.scraper`
-- Run API locally: `cd /home/dev/projects/flat-finder && uvicorn api.main:app --port 8090`
+- Rebuild: `cd /opt/mediastack && docker compose up -d --build flat-finder flat-finder-scraper`
+- Scraper logs: `docker logs flat-finder-scraper`
+- UI logs: `docker logs flat-finder`
+- UI URL: https://raspberrypi/flat/
