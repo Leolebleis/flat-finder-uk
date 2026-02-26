@@ -1,0 +1,57 @@
+# api/main.py
+from fastapi import FastAPI, Header, HTTPException, Query
+from shared.models import init_db, get_connection, get_listings
+from shared.config import DB_PATH, API_KEY
+from datetime import date
+
+app = FastAPI(title="Flat Finder API", root_path="/flat/api")
+
+@app.on_event("startup")
+def startup():
+    init_db(DB_PATH)
+
+def _check_key(x_api_key: str = Header(None)):
+    if not x_api_key or x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+@app.get("/listings")
+def list_listings(since: str | None = None, limit: int = Query(50, le=200),
+                  offset: int = 0, x_api_key: str = Header(None)):
+    _check_key(x_api_key)
+    conn = get_connection(DB_PATH)
+    listings = get_listings(conn, since=since, limit=limit, offset=offset)
+    conn.close()
+    return listings
+
+@app.get("/listings/{listing_id}")
+def get_listing(listing_id: str, x_api_key: str = Header(None)):
+    _check_key(x_api_key)
+    conn = get_connection(DB_PATH)
+    row = conn.execute("SELECT * FROM listings WHERE id = ?", (listing_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404)
+    return dict(row)
+
+@app.get("/stats")
+def stats(x_api_key: str = Header(None)):
+    _check_key(x_api_key)
+    conn = get_connection(DB_PATH)
+    total = conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0]
+    today = date.today().isoformat()
+    new_today = conn.execute(
+        "SELECT COUNT(*) FROM listings WHERE first_seen >= ?", (today,)
+    ).fetchone()[0]
+    avg_price = conn.execute(
+        "SELECT AVG(price_pcm) FROM listings WHERE price_pcm IS NOT NULL"
+    ).fetchone()[0]
+    sources = {}
+    for row in conn.execute("SELECT source, COUNT(*) as cnt FROM listings GROUP BY source"):
+        sources[row["source"]] = row["cnt"]
+    conn.close()
+    return {
+        "total_listings": total,
+        "new_today": new_today,
+        "avg_price": round(avg_price) if avg_price else None,
+        "sources": sources,
+    }
