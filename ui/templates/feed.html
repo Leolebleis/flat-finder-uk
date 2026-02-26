@@ -7,7 +7,15 @@
     <button class="filter-btn" data-filter="unseen">Unseen</button>
     <button class="filter-btn" data-filter="favourites">Favourites</button>
 
-    <select class="sort-select" onchange="window.location.href='?sort='+this.value">
+    <span class="filter-separator"></span>
+    <a class="filter-btn {% if zone == 'all' %}filter-btn--active{% endif %}"
+       href="?sort={{ sort }}&zone=all">All Zones</a>
+    {% for z in zones %}
+    <a class="filter-btn {% if zone == z %}filter-btn--active{% endif %}"
+       href="?sort={{ sort }}&zone={{ z }}">{{ z }}</a>
+    {% endfor %}
+
+    <select class="sort-select" onchange="window.location.href='?sort='+this.value+'&zone={{ zone }}'">
         {% for key, label in sort_options.items() %}
         <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
@@ -53,6 +61,9 @@
                 {% endif %}
                 {% if l.distance_mi is not none %}
                 <span class="meta-badge">{{ l.distance_mi }} mi</span>
+                {% endif %}
+                {% if l.commute_mins is not none %}
+                <span class="meta-badge meta-badge--commute">{{ l.commute_mins }} min</span>
                 {% endif %}
             </div>
 

@@ -131,6 +131,13 @@ a:hover { text-decoration: underline; }
   border-color: var(--accent);
 }
 
+.filter-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  align-self: center;
+}
+
 .sort-select {
   margin-left: auto;
   padding: 0.45rem 0.75rem;
@@ -249,6 +256,11 @@ a:hover { text-decoration: underline; }
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 0.8rem;
+}
+
+.meta-badge--commute {
+  background: #e3f0ff;
+  color: #0051a8;
 }
 
 .card__furnishing {

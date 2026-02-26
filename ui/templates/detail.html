@@ -56,6 +56,12 @@
         {% if listing.listing_date %}
         <span class="meta-badge">Listed {{ listing.listing_date }}</span>
         {% endif %}
+        {% if listing.commute_mins is not none %}
+        <span class="meta-badge meta-badge--commute">{{ listing.commute_mins }} min to Chelsea</span>
+        {% endif %}
+        {% if listing.zone %}
+        <span class="meta-badge">{{ listing.zone }}</span>
+        {% endif %}
     </div>
 
     <div class="detail__features">

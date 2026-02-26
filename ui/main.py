@@ -85,6 +85,7 @@ SORT_OPTIONS = {
     "price_desc": "Price (high to low)",
     "size_desc": "Size (largest)",
     "distance": "Distance (nearest)",
+    "commute": "Commute (shortest)",
 }
 
 
@@ -97,6 +98,8 @@ def _sort_listings(listings: list[dict], sort: str) -> list[dict]:
         return sorted(listings, key=lambda l: (l["sqft"] is None, -(l["sqft"] or 0)))
     elif sort == "distance":
         return sorted(listings, key=lambda l: (l["distance_mi"] is None, l["distance_mi"] or 999))
+    elif sort == "commute":
+        return sorted(listings, key=lambda l: (l.get("commute_mins") is None, l.get("commute_mins") or 999))
     return listings  # newest - already sorted by first_seen DESC from SQL
 
 # Templates and static files
@@ -108,7 +111,7 @@ app.mount("/static", StaticFiles(directory=str(_ui_dir / "static")), name="stati
 # --- Template routes ---
 
 @app.get("/", response_class=HTMLResponse, name="feed_page")
-def feed_page(request: Request, sort: str = "newest"):
+def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
     if sort not in SORT_OPTIONS:
         sort = "newest"
     conn = get_connection(UI_DB_PATH)
@@ -131,11 +134,16 @@ def feed_page(request: Request, sort: str = "newest"):
         else:
             d["distance_mi"] = None
         listings.append(d)
+    zones = sorted(set(d.get("zone") or "Unknown" for d in listings))
+    if zone != "all":
+        listings = [l for l in listings if (l.get("zone") or "Unknown") == zone]
     listings = _sort_listings(listings, sort)
     return templates.TemplateResponse(request, "feed.html", {
         "listings": listings,
         "sort": sort,
         "sort_options": SORT_OPTIONS,
+        "zones": zones,
+        "zone": zone,
     })
 
 
