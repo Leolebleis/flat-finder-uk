@@ -32,6 +32,7 @@ def test_listings_table_has_expected_columns():
         expected = {"id", "source", "url", "title", "price_pcm", "bedrooms",
                     "address", "latitude", "longitude", "description", "image_url",
                     "property_type", "furnishing", "sqft", "has_dishwasher",
-                    "has_washer", "has_outdoor", "outdoor_type", "first_seen", "listing_date"}
+                    "has_washer", "has_outdoor", "outdoor_type", "zone", "commute_mins",
+                    "first_seen", "listing_date"}
         assert expected == columns
         conn.close()
