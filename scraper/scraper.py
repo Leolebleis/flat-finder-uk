@@ -1,5 +1,6 @@
 # scraper/scraper.py
 import logging
+import re
 from pathlib import Path
 from shared.models import init_db, get_connection, insert_listing, get_state, set_state
 from shared.config import (DB_PATH, MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM,
@@ -13,6 +14,28 @@ from scraper.notifier import (format_ntfy_message, format_email_html,
                                format_failure_message, format_recovery_message)
 
 log = logging.getLogger("flat-finder")
+
+
+def _normalize_address(addr: str) -> str:
+    """Normalize address for dedup: lowercase, strip punctuation, collapse whitespace."""
+    addr = addr.lower().strip()
+    addr = re.sub(r"[,.\-']", " ", addr)
+    addr = re.sub(r"\s+", " ", addr)
+    # Strip "london" which one source may include and the other may not
+    addr = re.sub(r"\blondon\b", "", addr)
+    addr = re.sub(r"\s+", " ", addr)
+    return addr.strip()
+
+
+def _listing_fingerprint(listing: dict) -> tuple | None:
+    """Return a (normalized_address, price, bedrooms) tuple for cross-source dedup."""
+    addr = listing.get("address")
+    price = listing.get("price_pcm")
+    beds = listing.get("bedrooms")
+    if not addr or price is None or beds is None:
+        return None
+    return (_normalize_address(addr), price, beds)
+
 
 def is_first_run(conn) -> bool:
     return get_state(conn, "initialised") is None
@@ -63,6 +86,7 @@ def run() -> None:
 
     all_listings = []
     seen_ids = set()
+    seen_fingerprints = set()
 
     for zone in zones:
         rm_listings, rm_error = _scrape_source(
@@ -82,10 +106,18 @@ def run() -> None:
         _handle_failure_state(conn, f"openrent/{zone['name']}", or_error)
 
         for listing in rm_listings + or_listings:
-            if listing["id"] not in seen_ids:
-                listing["zone"] = zone["name"]
-                all_listings.append(listing)
-                seen_ids.add(listing["id"])
+            if listing["id"] in seen_ids:
+                continue
+            # Cross-source dedup: same address + price + bedrooms = same flat
+            fp = _listing_fingerprint(listing)
+            if fp and fp in seen_fingerprints:
+                log.debug(f"Skipping cross-source duplicate: {listing['id']}")
+                continue
+            listing["zone"] = zone["name"]
+            all_listings.append(listing)
+            seen_ids.add(listing["id"])
+            if fp:
+                seen_fingerprints.add(fp)
 
     new_listings = process_new_listings(conn, all_listings)
 

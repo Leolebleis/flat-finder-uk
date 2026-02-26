@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from shared.models import init_db, get_connection, insert_listing, get_state, set_state
-from scraper.scraper import process_new_listings, is_first_run
+from scraper.scraper import process_new_listings, is_first_run, _listing_fingerprint, _normalize_address
 
 def _make_listing(id="rightmove_1", price=1800):
     return {
@@ -60,3 +60,42 @@ def test_process_new_listings_preserves_zone():
         row = conn.execute("SELECT zone FROM listings WHERE id = ?", ("rightmove_1",)).fetchone()
         assert row["zone"] == "St John's Wood"
         conn.close()
+
+
+def test_normalize_address_strips_london_and_punctuation():
+    assert _normalize_address("Goldhurst Terrace, London, NW6") == "goldhurst terrace nw6"
+    assert _normalize_address("Goldhurst Terrace, NW6") == "goldhurst terrace nw6"
+
+
+def test_listing_fingerprint_matches_cross_source():
+    rm = _make_listing("rightmove_1")
+    rm["address"] = "Goldhurst Terrace, London, NW6"
+    rm["price_pcm"] = 2100
+    rm["bedrooms"] = 1
+
+    orr = _make_listing("openrent_1")
+    orr["address"] = "Goldhurst Terrace, NW6"
+    orr["price_pcm"] = 2100
+    orr["bedrooms"] = 1
+
+    assert _listing_fingerprint(rm) == _listing_fingerprint(orr)
+
+
+def test_listing_fingerprint_differs_on_price():
+    a = _make_listing("rm_1")
+    a["address"] = "Goldhurst Terrace, NW6"
+    a["price_pcm"] = 2100
+    a["bedrooms"] = 1
+
+    b = _make_listing("or_1")
+    b["address"] = "Goldhurst Terrace, NW6"
+    b["price_pcm"] = 1800
+    b["bedrooms"] = 1
+
+    assert _listing_fingerprint(a) != _listing_fingerprint(b)
+
+
+def test_listing_fingerprint_none_when_missing_fields():
+    l = _make_listing("rm_1")
+    l["address"] = None
+    assert _listing_fingerprint(l) is None
