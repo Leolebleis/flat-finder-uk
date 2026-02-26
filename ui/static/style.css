@@ -27,6 +27,57 @@
   --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
   --shadow-hover: 0 4px 12px rgba(0,0,0,0.12);
   --transition: 0.2s ease;
+  --navbar-bg: #fff;
+  --card-border-subtle: #f0f0f0;
+  --img-placeholder: #e5e5ea;
+  --distance-bg: #f0eaff;
+  --distance-text: #5e35b1;
+  --commute-bg: #e3f0ff;
+  --commute-text: #0051a8;
+  --feature-no-bg: #ffecea;
+  --feature-no-text: #c0392b;
+  --feature-yes-bg: var(--green-bg);
+  --feature-yes-text: #1a7a32;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a1a;
+    --card-bg: #2a2a2a;
+    --text: #e5e5e7;
+    --text-secondary: #9a9a9f;
+    --border: #3a3a3c;
+    --accent: #4da3ff;
+    --accent-hover: #6db5ff;
+    --green-bg: #1a3326;
+    --grey-pill: #3a3a3c;
+    --seen-opacity: 0.4;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-hover: 0 4px 12px rgba(0,0,0,0.4);
+    --navbar-bg: #222;
+    --card-border-subtle: #3a3a3c;
+    --img-placeholder: #333;
+    --distance-bg: #2a2040;
+    --distance-text: #b39ddb;
+    --commute-bg: #1a2a40;
+    --commute-text: #7db8f0;
+    --feature-no-bg: #3a1a1a;
+    --feature-no-text: #f08080;
+    --feature-yes-bg: #1a3326;
+    --feature-yes-text: #66d98e;
+  }
+
+  .sort-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239a9a9f' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  }
+
+  .detail__source-link:hover {
+    color: #fff;
+  }
+
+  img {
+    opacity: 0.92;
+  }
 }
 
 html {
@@ -47,7 +98,7 @@ a:hover { text-decoration: underline; }
 
 /* --- Nav --- */
 .navbar {
-  background: #fff;
+  background: var(--navbar-bg);
   border-bottom: 1px solid var(--border);
   padding: 0 1.5rem;
   position: sticky;
@@ -111,7 +162,7 @@ a:hover { text-decoration: underline; }
   padding: 0.5rem 1rem;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 500;
@@ -156,7 +207,7 @@ a.filter-btn--active:hover {
   padding: 0.45rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 500;
@@ -211,7 +262,7 @@ a.filter-btn--active:hover {
   width: 100%;
   height: 200px;
   overflow: hidden;
-  background: #e5e5ea;
+  background: var(--img-placeholder);
 }
 
 .card__img {
@@ -272,13 +323,13 @@ a.filter-btn--active:hover {
 }
 
 .meta-badge--distance {
-  background: #f0eaff;
-  color: #5e35b1;
+  background: var(--distance-bg);
+  color: var(--distance-text);
 }
 
 .meta-badge--commute {
-  background: #e3f0ff;
-  color: #0051a8;
+  background: var(--commute-bg);
+  color: var(--commute-text);
 }
 
 .card__furnishing {
@@ -302,8 +353,8 @@ a.filter-btn--active:hover {
 }
 
 .feature-pill--yes {
-  background: var(--green-bg);
-  color: #1a7a32;
+  background: var(--feature-yes-bg);
+  color: var(--feature-yes-text);
 }
 
 .feature-pill--unknown {
@@ -312,8 +363,8 @@ a.filter-btn--active:hover {
 }
 
 .feature-pill--no {
-  background: #ffecea;
-  color: #c0392b;
+  background: var(--feature-no-bg);
+  color: var(--feature-no-text);
 }
 
 /* Card actions row */
@@ -323,7 +374,7 @@ a.filter-btn--active:hover {
   align-items: center;
   margin-top: auto;
   padding-top: 0.5rem;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--card-border-subtle);
 }
 
 .btn {
@@ -333,7 +384,7 @@ a.filter-btn--active:hover {
   padding: 0.4rem 0.75rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 500;
@@ -391,6 +442,7 @@ a.filter-btn--active:hover {
   padding: 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  background: var(--card-bg);
   font-family: var(--font-stack);
   font-size: 0.82rem;
   color: var(--text);
@@ -427,7 +479,7 @@ a.filter-btn--active:hover {
   height: 350px;
   border-radius: var(--radius);
   overflow: hidden;
-  background: #e5e5ea;
+  background: var(--img-placeholder);
   margin-bottom: 1.5rem;
 }
 
