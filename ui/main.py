@@ -88,28 +88,34 @@ def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> floa
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def _compute_scores(listings: list[dict], w_commute: float = 0.5, w_gym: float = 0.5) -> None:
-    """Compute weighted match scores in-place. Mutates each listing dict."""
-    commute_vals = [l["commute_mins"] for l in listings if l.get("commute_mins") is not None]
-    gym_vals = [l["gym_commute_mins"] for l in listings if l.get("gym_commute_mins") is not None]
-
-    c_min = c_max = c_range = 0
-    g_min = g_max = g_range = 0
-    if commute_vals:
-        c_min, c_max = min(commute_vals), max(commute_vals)
-        c_range = c_max - c_min if c_max != c_min else 1
-    if gym_vals:
-        g_min, g_max = min(gym_vals), max(gym_vals)
-        g_range = g_max - g_min if g_max != g_min else 1
-
+def _compute_scores(listings: list[dict], poi_ids: list[int],
+                    weights: dict[int, float] | None = None) -> None:
+    """Compute weighted match scores in-place using dynamic POIs."""
+    if not poi_ids:
+        for l in listings:
+            l["match_score"] = None
+        return
+    if weights is None:
+        w = 1.0 / len(poi_ids)
+        weights = {pid: w for pid in poi_ids}
+    total = sum(weights.values())
+    if total > 0:
+        weights = {k: v / total for k, v in weights.items()}
+    stats: dict[int, dict] = {}
+    for pid in poi_ids:
+        vals = [l["poi_commutes"][pid] for l in listings
+                if pid in l.get("poi_commutes", {})]
+        if vals:
+            mn, mx = min(vals), max(vals)
+            stats[pid] = {"min": mn, "max": mx, "range": mx - mn if mx != mn else 1}
     for l in listings:
-        c_score = 0.0
-        g_score = 0.0
-        if l.get("commute_mins") is not None and commute_vals:
-            c_score = 100 * (1 - (l["commute_mins"] - c_min) / c_range)
-        if l.get("gym_commute_mins") is not None and gym_vals:
-            g_score = 100 * (1 - (l["gym_commute_mins"] - g_min) / g_range)
-        l["match_score"] = round(w_commute * c_score + w_gym * g_score)
+        total_score = 0.0
+        for pid in poi_ids:
+            if pid in stats and pid in l.get("poi_commutes", {}):
+                s = stats[pid]
+                val = l["poi_commutes"][pid]
+                total_score += weights.get(pid, 0) * 100 * (1 - (val - s["min"]) / s["range"])
+        l["match_score"] = round(total_score)
 
 
 SORT_OPTIONS = {
@@ -180,7 +186,18 @@ def _get_feed_data(sort: str, zone: str) -> dict:
     zones = sorted(set(d.get("zone") or "Unknown" for d in listings))
     if zone != "all":
         listings = [l for l in listings if (l.get("zone") or "Unknown") == zone]
-    _compute_scores(listings)
+    # Load POIs and their commute data
+    conn = get_connection(UI_DB_PATH)
+    pois = get_pois(conn)
+    listing_ids = [l["id"] for l in listings]
+    all_commutes = get_poi_commutes_for_listings(conn, listing_ids)
+    conn.close()
+    for l in listings:
+        l["poi_commutes"] = all_commutes.get(l["id"], {})
+    for poi in pois:
+        poi["color"] = POI_COLORS[poi["color_index"] % len(POI_COLORS)]
+    poi_ids = [p["id"] for p in pois]
+    _compute_scores(listings, poi_ids)
     listings = _sort_listings(listings, sort)
     return {
         "listings": listings,
@@ -188,6 +205,7 @@ def _get_feed_data(sort: str, zone: str) -> dict:
         "sort_options": SORT_OPTIONS,
         "zones": zones,
         "zone": zone,
+        "pois": pois,
     }
 
 
@@ -220,7 +238,15 @@ def _get_detail_data(listing_id: str) -> dict:
         listing["has_washer"] = listing["override_washer"]
     if listing.get("override_outdoor"):
         listing["has_outdoor"] = listing["override_outdoor"]
-    return {"listing": listing}
+    # Load POI commutes for this listing
+    conn = get_connection(UI_DB_PATH)
+    pois = get_pois(conn)
+    commutes_map = get_poi_commutes_for_listings(conn, [listing_id])
+    conn.close()
+    listing["poi_commutes"] = commutes_map.get(listing_id, {})
+    for poi in pois:
+        poi["color"] = POI_COLORS[poi["color_index"] % len(POI_COLORS)]
+    return {"listing": listing, "pois": pois}
 
 
 # --- Template routes ---

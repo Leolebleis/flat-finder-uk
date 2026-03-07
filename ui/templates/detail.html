@@ -76,12 +76,11 @@
             {% if listing.listing_date %}
             <span class="metric">Listed {{ listing.listing_date }}</span>
             {% endif %}
-            {% if listing.commute_mins is not none %}
-            <span class="metric metric--commute">{{ listing.commute_mins }} min commute</span>
+            {% for poi in pois %}
+            {% if poi.id in listing.poi_commutes %}
+            <span class="metric" style="background: var(--poi-bg-{{ poi.color_index % 8 }}); color: var(--poi-color-{{ poi.color_index % 8 }});">{{ listing.poi_commutes[poi.id] }} min to {{ poi.name }}</span>
             {% endif %}
-            {% if listing.gym_commute_mins is not none %}
-            <span class="metric metric--gym">{{ listing.gym_commute_mins }} min to gym</span>
-            {% endif %}
+            {% endfor %}
             {% if listing.zone %}
             <span class="metric">{{ listing.zone }}</span>
             {% endif %}

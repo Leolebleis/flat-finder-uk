@@ -3,7 +3,7 @@ import tempfile
 import os
 from pathlib import Path
 from fastapi.testclient import TestClient
-from shared.models import init_db, get_connection, insert_listing, get_pois, insert_poi
+from shared.models import init_db, get_connection, insert_listing, get_pois, insert_poi, upsert_poi_commute
 
 
 USER_STATE_SCHEMA = """
@@ -246,11 +246,15 @@ def test_feed_page_shows_gym_commute():
         db_path = Path(f.name)
         _setup_db(db_path)
         _seed_listing(db_path, gym_commute_mins=12)
+        conn = get_connection(db_path)
+        poi_id = insert_poi(conn, "Gym", 51.5445, -0.1762, 1)
+        upsert_poi_commute(conn, "rightmove_1", poi_id, 12)
+        conn.close()
         client = _make_app(db_path)
 
         resp = client.get("/")
         assert resp.status_code == 200
-        assert "min to gym" in resp.text
+        assert "min to Gym" in resp.text
 
 
 def test_feed_page_best_match_sort():
@@ -268,6 +272,11 @@ def test_feed_page_best_match_sort():
             "latitude": 51.49, "longitude": -0.18,
             "commute_mins": 30,
         })
+        conn = get_connection(db_path)
+        poi_id = insert_poi(conn, "Work", 51.4869, -0.1832, 0)
+        upsert_poi_commute(conn, "close_gym", poi_id, 60)
+        upsert_poi_commute(conn, "short_commute", poi_id, 30)
+        conn.close()
         client = _make_app(db_path)
 
         resp = client.get("/?sort=best_match")
@@ -410,3 +419,36 @@ def test_add_poi_rejects_invalid_url():
         pois = get_pois(conn)
         conn.close()
         assert len(pois) == 0
+
+
+# --- Dynamic POI feed/detail tests ---
+
+def test_feed_page_with_pois_shows_dynamic_metrics():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        _seed_listing(db_path)
+        conn = get_connection(db_path)
+        poi_id = insert_poi(conn, "Rue's", 51.4869, -0.1832, 0)
+        upsert_poi_commute(conn, "rightmove_1", poi_id, 35)
+        conn.close()
+        client = _make_app(db_path)
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "35 min to Rue" in resp.text
+        assert "poi-weight-slider" in resp.text
+
+
+def test_detail_page_with_pois_shows_dynamic_metrics():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        _seed_listing(db_path)
+        conn = get_connection(db_path)
+        poi_id = insert_poi(conn, "Office", 51.4869, -0.1832, 0)
+        upsert_poi_commute(conn, "rightmove_1", poi_id, 22)
+        conn.close()
+        client = _make_app(db_path)
+        resp = client.get("/listing/rightmove_1")
+        assert resp.status_code == 200
+        assert "22 min to Office" in resp.text
