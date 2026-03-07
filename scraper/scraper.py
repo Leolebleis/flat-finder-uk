@@ -153,6 +153,17 @@ def run() -> None:
                 conn.commit()
             time.sleep(0.5)  # Avoid TfL rate limiting
 
+    # Prune listings older than 2 weeks
+    pruned = conn.execute(
+        "DELETE FROM listings WHERE first_seen < datetime('now', '-14 days')"
+    ).rowcount
+    if pruned:
+        conn.execute(
+            "DELETE FROM user_state WHERE listing_id NOT IN (SELECT id FROM listings)"
+        )
+        conn.commit()
+        log.info(f"Pruned {pruned} listings older than 2 weeks")
+
     if first_run:
         set_state(conn, "initialised", "true")
         log.info(f"First run: found {len(all_listings)} existing listings")
