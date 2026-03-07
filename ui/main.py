@@ -14,8 +14,10 @@ from pydantic import BaseModel
 
 from shared.models import (init_db, get_connection, get_listings,
                            get_pois, insert_poi, delete_poi,
-                           get_poi_commutes_for_listings, upsert_poi_commute)
+                           get_poi_commutes_for_listings, upsert_poi_commute,
+                           get_zones, insert_zone, update_zone, delete_zone)
 from shared.geo import extract_coords_from_url
+from shared.zones import compute_zone_params, resolve_postcode, resolve_rightmove_id
 
 log = logging.getLogger("flat-finder-ui")
 
@@ -414,3 +416,79 @@ def api_listings():
             d["has_outdoor"] = d["override_outdoor"]
         result.append(d)
     return result
+
+
+# --- Zone API routes ---
+
+@app.get("/api/zones")
+def api_zones():
+    conn = get_connection(UI_DB_PATH)
+    zones = get_zones(conn)
+    conn.close()
+    for z in zones:
+        z["color"] = POI_COLORS[z["color_index"] % len(POI_COLORS)]
+    return zones
+
+
+@app.post("/api/zones")
+def api_create_zone(body: dict):
+    import json as _json
+    geometry = body.get("geometry")
+    name = body.get("name", "").strip()
+    if not geometry or not name:
+        raise HTTPException(400, "name and geometry required")
+    params = compute_zone_params(geometry)
+    postcode = resolve_postcode(params["centroid_lat"], params["centroid_lng"])
+    rightmove_id = resolve_rightmove_id(postcode) if postcode else None
+    conn = get_connection(UI_DB_PATH)
+    existing_zones = get_zones(conn)
+    color_index = len(existing_zones) % len(POI_COLORS)
+    zone_id = insert_zone(
+        conn, name, _json.dumps(geometry),
+        centroid_lat=params["centroid_lat"],
+        centroid_lng=params["centroid_lng"],
+        covering_radius_km=params["covering_radius_km"],
+        rightmove_id=rightmove_id,
+        openrent_term=postcode,
+        color_index=color_index,
+    )
+    zones = get_zones(conn)
+    zone = next(z for z in zones if z["id"] == zone_id)
+    conn.close()
+    zone["color"] = POI_COLORS[zone["color_index"] % len(POI_COLORS)]
+    return zone
+
+
+@app.put("/api/zones/{zone_id}")
+def api_update_zone(zone_id: int, body: dict):
+    import json as _json
+    geometry = body.get("geometry")
+    name = body.get("name", "").strip()
+    if not geometry or not name:
+        raise HTTPException(400, "name and geometry required")
+    params = compute_zone_params(geometry)
+    postcode = resolve_postcode(params["centroid_lat"], params["centroid_lng"])
+    rightmove_id = resolve_rightmove_id(postcode) if postcode else None
+    conn = get_connection(UI_DB_PATH)
+    update_zone(conn, zone_id,
+                name=name, geometry=_json.dumps(geometry),
+                centroid_lat=params["centroid_lat"],
+                centroid_lng=params["centroid_lng"],
+                covering_radius_km=params["covering_radius_km"],
+                rightmove_id=rightmove_id,
+                openrent_term=postcode)
+    zones = get_zones(conn)
+    zone = next((z for z in zones if z["id"] == zone_id), None)
+    conn.close()
+    if not zone:
+        raise HTTPException(404, "Zone not found")
+    zone["color"] = POI_COLORS[zone["color_index"] % len(POI_COLORS)]
+    return zone
+
+
+@app.delete("/api/zones/{zone_id}")
+def api_delete_zone(zone_id: int):
+    conn = get_connection(UI_DB_PATH)
+    delete_zone(conn, zone_id)
+    conn.close()
+    return {"ok": True}

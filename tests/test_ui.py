@@ -1,9 +1,12 @@
 # tests/test_ui.py
+import json
 import tempfile
 import os
 from pathlib import Path
+from unittest.mock import patch
 from fastapi.testclient import TestClient
-from shared.models import init_db, get_connection, insert_listing, get_pois, insert_poi, upsert_poi_commute
+from shared.models import (init_db, get_connection, insert_listing, get_pois,
+                           insert_poi, upsert_poi_commute, get_zones, insert_zone)
 
 
 USER_STATE_SCHEMA = """
@@ -452,3 +455,84 @@ def test_detail_page_with_pois_shows_dynamic_metrics():
         resp = client.get("/listing/rightmove_1")
         assert resp.status_code == 200
         assert "22 min to Office" in resp.text
+
+
+# --- Zone API tests ---
+
+SAMPLE_GEOMETRY = {"type":"Polygon","coordinates":[[[-0.19,51.54],[-0.17,51.54],[-0.17,51.55],[-0.19,51.55],[-0.19,51.54]]]}
+
+
+def test_api_get_zones_empty():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        client = _make_app(db_path)
+        resp = client.get("/api/zones")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
+def test_api_create_zone():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        client = _make_app(db_path)
+        with patch("ui.main.resolve_postcode", return_value="NW6"), \
+             patch("ui.main.resolve_rightmove_id", return_value="OUTCODE^1862"):
+            resp = client.post("/api/zones", json={
+                "name": "Test Zone",
+                "geometry": SAMPLE_GEOMETRY,
+            })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["name"] == "Test Zone"
+        assert data["rightmove_id"] == "OUTCODE^1862"
+        assert data["openrent_term"] == "NW6"
+        conn = get_connection(db_path)
+        zones = get_zones(conn)
+        conn.close()
+        assert len(zones) == 1
+
+
+def test_api_delete_zone():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        conn = get_connection(db_path)
+        zone_id = insert_zone(conn, "Test", json.dumps(SAMPLE_GEOMETRY),
+                              centroid_lat=51.545, centroid_lng=-0.18,
+                              covering_radius_km=1.2,
+                              rightmove_id="OUTCODE^1862",
+                              openrent_term="NW6",
+                              color_index=0)
+        conn.close()
+        client = _make_app(db_path)
+        resp = client.delete(f"/api/zones/{zone_id}")
+        assert resp.status_code == 200
+        conn = get_connection(db_path)
+        zones = get_zones(conn)
+        conn.close()
+        assert len(zones) == 0
+
+
+def test_api_update_zone():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        conn = get_connection(db_path)
+        zone_id = insert_zone(conn, "Old", json.dumps(SAMPLE_GEOMETRY),
+                              centroid_lat=51.545, centroid_lng=-0.18,
+                              covering_radius_km=1.2,
+                              rightmove_id="OUTCODE^1862",
+                              openrent_term="NW6",
+                              color_index=0)
+        conn.close()
+        client = _make_app(db_path)
+        with patch("ui.main.resolve_postcode", return_value="NW6"), \
+             patch("ui.main.resolve_rightmove_id", return_value="OUTCODE^1862"):
+            resp = client.put(f"/api/zones/{zone_id}", json={
+                "name": "Updated",
+                "geometry": SAMPLE_GEOMETRY,
+            })
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "Updated"
