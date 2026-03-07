@@ -28,6 +28,15 @@
         color: #fff;
         border-color: #333;
     }
+    .zone-label {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: #666;
+    }
 </style>
 {% endblock %}
 {% block content %}
@@ -35,6 +44,7 @@
     <button id="filter-all" class="active" onclick="setFilter('all')">All</button>
     <button id="filter-unseen" onclick="setFilter('unseen')">Unseen</button>
     <button id="filter-favourites" onclick="setFilter('favourites')">Favourites</button>
+    <button id="filter-zones" class="active" onclick="toggleZones()">Zones</button>
 </div>
 <div id="map"></div>
 <script src="{{ request.url_for('static', path='map.js') }}"></script>

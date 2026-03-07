@@ -189,7 +189,7 @@ FIXTURE_HTML = """
 def test_build_search_url_includes_all_parameters():
     url = build_search_url(
         location="Finchley Road Station",
-        radius_miles=1,
+        radius_km=1,
         min_beds=1,
         max_beds=2,
         max_price=2200,
@@ -206,7 +206,7 @@ def test_build_search_url_includes_all_parameters():
 def test_build_search_url_encodes_spaces():
     url = build_search_url(
         location="Finchley Road Station",
-        radius_miles=1,
+        radius_km=1,
         min_beds=1,
         max_beds=2,
         max_price=2200,

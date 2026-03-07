@@ -3,10 +3,10 @@ import logging
 import re
 import time
 from pathlib import Path
-from shared.models import init_db, get_connection, insert_listing, get_state, set_state, get_pois, upsert_poi_commute
+from shared.models import init_db, get_connection, insert_listing, get_state, set_state, get_pois, upsert_poi_commute, get_zones
 from shared.config import (DB_PATH, MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM,
-                           NTFY_TOPIC, GMAIL_ADDRESS, GMAIL_APP_PASSWORD,
-                           load_zones)
+                           NTFY_TOPIC, GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+from shared.zones import point_in_zone
 from scraper.rightmove import fetch_rightmove
 from scraper.openrent import fetch_openrent
 from scraper.commute import tfl_journey_mins
@@ -79,34 +79,56 @@ def _handle_failure_state(conn, source: str, error: str | None) -> None:
             title, body = format_recovery_message(source)
             _notify_safe(send_ntfy, NTFY_TOPIC, title, body)
 
+def _filter_listings_by_zone(listings: list[dict], zone: dict) -> list[dict]:
+    """Keep only listings inside the zone polygon. Keep those without coords."""
+    geom_str = zone.get("geometry")
+    if not geom_str:
+        return listings
+    return [
+        l for l in listings
+        if not (l.get("latitude") and l.get("longitude"))
+        or point_in_zone(l["latitude"], l["longitude"], geom_str)
+    ]
+
+
 def run() -> None:
     init_db(DB_PATH)
     conn = get_connection(DB_PATH)
     first_run = is_first_run(conn)
-    zones = load_zones()
+    zones = [dict(z) for z in get_zones(conn)]
 
     all_listings = []
     seen_ids = set()
     seen_fingerprints = set()
 
     for zone in zones:
+        # DB zones store covering_radius_km; convert to miles for Rightmove
+        radius_km = zone.get("covering_radius_km", 1.6)  # ~1 mile default
+        rm_radius_miles = radius_km / 1.60934
+        or_radius_km = radius_km
+
         rm_listings, rm_error = _scrape_source(
             f"rightmove/{zone['name']}",
-            lambda z=zone: fetch_rightmove(z["rightmove_id"], z["radius_miles"],
-                                           MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
+            lambda z=zone, r=rm_radius_miles: fetch_rightmove(
+                z.get("rightmove_id", ""), r,
+                MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
             conn,
         )
         or_listings, or_error = _scrape_source(
             f"openrent/{zone['name']}",
-            lambda z=zone: fetch_openrent(z["openrent_term"], z["radius_miles"],
-                                          MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
+            lambda z=zone, r=or_radius_km: fetch_openrent(
+                z.get("openrent_term", ""), r,
+                MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
             conn,
         )
 
         _handle_failure_state(conn, f"rightmove/{zone['name']}", rm_error)
         _handle_failure_state(conn, f"openrent/{zone['name']}", or_error)
 
-        for listing in rm_listings + or_listings:
+        # Post-filter by polygon
+        combined = _filter_listings_by_zone(rm_listings + or_listings, zone)
+
+        for listing in combined:
             if listing["id"] in seen_ids:
                 continue
             # Cross-source dedup: same address + price + bedrooms = same flat

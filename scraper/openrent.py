@@ -11,12 +11,12 @@ BASE_URL = "https://www.openrent.co.uk/properties-to-rent"
 EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
 
 
-def build_search_url(location: str, radius_miles: int, min_beds: int,
+def build_search_url(location: str, radius_km: int, min_beds: int,
                      max_beds: int, max_price: int) -> str:
     """Build an OpenRent search URL from parameters."""
     params = {
         "term": location,
-        "within": radius_miles,
+        "within": radius_km,
         "prices_min": 0,
         "prices_max": max_price,
         "bedrooms_min": min_beds,
@@ -192,10 +192,10 @@ def parse_openrent_html(html: str) -> list[dict]:
     return listings
 
 
-def fetch_openrent(location: str, radius_miles: int, min_beds: int,
+def fetch_openrent(location: str, radius_km: int, min_beds: int,
                    max_beds: int, max_price: int) -> list[dict]:
     """Fetch and parse OpenRent search results."""
-    url = build_search_url(location, radius_miles, min_beds, max_beds, max_price)
+    url = build_search_url(location, radius_km, min_beds, max_beds, max_price)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

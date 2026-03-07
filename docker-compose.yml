@@ -21,7 +21,6 @@ services:
     restart: unless-stopped
     volumes:
       - flat-finder-data:/app/data
-      - /opt/mediastack/config/flat-finder/zones.json:/app/config/zones.json:ro
     environment:
       - FLAT_FINDER_DB=/app/data/flat_finder.db
       - NTFY_TOPIC=${NTFY_TOPIC:-}
