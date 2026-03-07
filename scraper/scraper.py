@@ -156,6 +156,14 @@ def run() -> None:
                         upsert_poi_commute(conn, row["id"], poi["id"], mins)
                     time.sleep(0.5)
 
+    # Attach poi_commutes to new listings for notification
+    for listing in new_listings:
+        commute_rows = conn.execute(
+            "SELECT poi_id, commute_mins FROM poi_commutes WHERE listing_id = ?",
+            (listing["id"],),
+        ).fetchall()
+        listing["poi_commutes"] = {row["poi_id"]: row["commute_mins"] for row in commute_rows}
+
     # Prune listings older than 2 weeks
     pruned = conn.execute(
         "DELETE FROM listings WHERE first_seen < datetime('now', '-14 days')"
@@ -163,6 +171,9 @@ def run() -> None:
     if pruned:
         conn.execute(
             "DELETE FROM user_state WHERE listing_id NOT IN (SELECT id FROM listings)"
+        )
+        conn.execute(
+            "DELETE FROM poi_commutes WHERE listing_id NOT IN (SELECT id FROM listings)"
         )
         conn.commit()
         log.info(f"Pruned {pruned} listings older than 2 weeks")
@@ -176,7 +187,7 @@ def run() -> None:
     elif new_listings:
         log.info(f"Found {len(new_listings)} new listings")
         if NTFY_TOPIC:
-            title, body = format_ntfy_message(new_listings)
+            title, body = format_ntfy_message(new_listings, pois)
             click_url = new_listings[0].get("url")
             _notify_safe(send_ntfy, NTFY_TOPIC, title, body, click_url=click_url)
         if GMAIL_ADDRESS and GMAIL_APP_PASSWORD:

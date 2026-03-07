@@ -7,10 +7,10 @@ from html import escape
 import requests
 
 
-def format_ntfy_message(listings: list[dict]) -> tuple[str, str]:
+def format_ntfy_message(listings: list[dict], pois: list[dict] | None = None) -> tuple[str, str]:
     """Returns (title, body) for a bundled notification.
     Title: "3 new flats found" / "1 new flat found"
-    Body: one line per listing with address + price.
+    Body: one line per listing with address + price + commute times.
     """
     count = len(listings)
     title = f"{count} new flat{'s' if count != 1 else ''} found"
@@ -19,7 +19,16 @@ def format_ntfy_message(listings: list[dict]) -> tuple[str, str]:
         address = listing.get("address", "Unknown")
         price = listing.get("price_pcm")
         price_str = f"£{price:,}" if price is not None else "Price unknown"
-        lines.append(f"{address} - {price_str}")
+        parts = [f"{address} - {price_str}"]
+        if pois and listing.get("poi_commutes"):
+            commute_parts = []
+            for poi in pois:
+                mins = listing["poi_commutes"].get(poi["id"])
+                if mins is not None:
+                    commute_parts.append(f"{mins}min to {poi['name']}")
+            if commute_parts:
+                parts.append(", ".join(commute_parts))
+        lines.append(" | ".join(parts))
     body = "\n".join(lines)
     return title, body
 
