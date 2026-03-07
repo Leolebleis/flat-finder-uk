@@ -4,16 +4,22 @@
 
 ## Architecture (Pi-only)
 
-Everything runs on Pi as Docker containers in mediastack. No VPS involvement.
+Everything runs on Pi as Docker containers via its own `docker-compose.yml` (separate from mediastack). No VPS involvement.
 
 ### Containers
-- **flat-finder** (UI): uvicorn on port 8000, FastAPI + Jinja2. Nginx proxies `/flat/` to it.
+- **flat-finder** (UI): uvicorn on port 8000, FastAPI + Jinja2. Nginx (mediastack) proxies `/flat/` to it via external `flat-finder-net` Docker network.
 - **flat-finder-scraper**: 15min sleep loop, scrapes Rightmove + OpenRent across configured zones, fetches TfL commute times (work + gym) for new listings.
+
+### Networking
+- External Docker network `flat-finder-net` bridges mediastack's nginx to flat-finder UI
+- Both nginx (mediastack) and flat-finder join this network
+- Scraper has no inbound connections, only needs outbound internet
 
 ### Shared State
 - Both containers mount `flat-finder-data:/app/data` volume
 - Same SQLite DB: `/app/data/flat_finder.db` (WAL mode for concurrent access)
 - Zone config: `/opt/mediastack/config/flat-finder/zones.json` mounted read-only into scraper
+- Env vars (NTFY_TOPIC, GMAIL_*) in `.env` (gitignored)
 
 ### Features
 - Multi-zone search (Finchley Road + St John's Wood, configurable via zones.json)
@@ -27,7 +33,7 @@ Everything runs on Pi as Docker containers in mediastack. No VPS involvement.
 - Zone filter buttons, commute sort
 - Seen/favourite/notes per listing (user_state table)
 - Dark mode (prefers-color-scheme)
-- ntfy + Gmail notifications for new listings
+- ntfy + Gmail notifications for new listings (tapping ntfy opens listing URL)
 - Listing date shown on cards (first_seen, DD/MM/YYYY format)
 - Sqft displayed as m² (converted at render time)
 - Map view with image previews in popups
