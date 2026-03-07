@@ -19,6 +19,7 @@
                 <a class="nav__link {% if '/listing' not in request.url.path %}nav__link--active{% endif %}"
                    href="{{ request.url_for('feed_page') }}">Feed</a>
                 <a class="nav__link" href="{{ request.url_for('map_page') }}">Map</a>
+                <a class="nav__link" href="{{ request.url_for('settings_page') }}">Settings</a>
             </div>
         </div>
     </nav>

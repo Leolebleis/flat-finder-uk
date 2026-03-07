@@ -3,7 +3,7 @@ import tempfile
 import os
 from pathlib import Path
 from fastapi.testclient import TestClient
-from shared.models import init_db, get_connection, insert_listing
+from shared.models import init_db, get_connection, insert_listing, get_pois, insert_poi
 
 
 USER_STATE_SCHEMA = """
@@ -347,3 +347,66 @@ def test_feed_page_applies_overrides():
         assert resp.status_code == 200
         assert "Dishwasher" in resp.text
         assert "No dishwasher" not in resp.text
+
+
+# --- Settings page tests ---
+
+def test_settings_page_returns_html():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        client = _make_app(db_path)
+        resp = client.get("/settings")
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+
+
+def test_add_poi_via_settings():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        client = _make_app(db_path)
+        resp = client.post("/settings/poi", data={
+            "name": "Office",
+            "maps_url": "https://www.google.com/maps/@51.4869,-0.1832,17z/"
+        }, follow_redirects=False)
+        assert resp.status_code == 303
+        conn = get_connection(db_path)
+        pois = get_pois(conn)
+        conn.close()
+        assert len(pois) == 1
+        assert pois[0]["name"] == "Office"
+        assert abs(pois[0]["lat"] - 51.4869) < 0.001
+        assert abs(pois[0]["lng"] - (-0.1832)) < 0.001
+
+
+def test_delete_poi_via_settings():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        conn = get_connection(db_path)
+        poi_id = insert_poi(conn, "Test", 51.5, -0.1, 0)
+        conn.close()
+        client = _make_app(db_path)
+        resp = client.delete(f"/settings/poi/{poi_id}")
+        assert resp.status_code == 200
+        conn = get_connection(db_path)
+        pois = get_pois(conn)
+        conn.close()
+        assert len(pois) == 0
+
+
+def test_add_poi_rejects_invalid_url():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        _setup_db(db_path)
+        client = _make_app(db_path)
+        resp = client.post("/settings/poi", data={
+            "name": "Bad",
+            "maps_url": "not a url"
+        }, follow_redirects=False)
+        assert resp.status_code == 303
+        conn = get_connection(db_path)
+        pois = get_pois(conn)
+        conn.close()
+        assert len(pois) == 0

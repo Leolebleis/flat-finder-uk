@@ -6,13 +6,16 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from shared.models import init_db, get_connection, get_listings
+from shared.models import (init_db, get_connection, get_listings,
+                           get_pois, insert_poi, delete_poi,
+                           get_poi_commutes_for_listings, upsert_poi_commute)
+from shared.geo import extract_coords_from_url
 
 log = logging.getLogger("flat-finder-ui")
 
@@ -62,6 +65,17 @@ app = FastAPI(title="Flat Finder UI", root_path="/flat", lifespan=lifespan)
 # Finchley Road Station coordinates for distance calculation
 STATION_LAT = 51.5472
 STATION_LNG = -0.1803
+
+POI_COLORS = [
+    {"name": "blue",    "color": "#1d4ed8", "bg": "#dbeafe", "dark_color": "#93c5fd", "dark_bg": "#172554"},
+    {"name": "orange",  "color": "#c2410c", "bg": "#ffedd5", "dark_color": "#fdba74", "dark_bg": "#431407"},
+    {"name": "purple",  "color": "#7c3aed", "bg": "#ede9fe", "dark_color": "#c4b5fd", "dark_bg": "#2e1065"},
+    {"name": "teal",    "color": "#0f766e", "bg": "#ccfbf1", "dark_color": "#2dd4bf", "dark_bg": "#042f2e"},
+    {"name": "rose",    "color": "#be123c", "bg": "#ffe4e6", "dark_color": "#fda4af", "dark_bg": "#4c0519"},
+    {"name": "amber",   "color": "#b45309", "bg": "#fef3c7", "dark_color": "#fcd34d", "dark_bg": "#451a03"},
+    {"name": "emerald", "color": "#047857", "bg": "#d1fae5", "dark_color": "#34d399", "dark_bg": "#064e3b"},
+    {"name": "slate",   "color": "#475569", "bg": "#f1f5f9", "dark_color": "#94a3b8", "dark_bg": "#1e293b"},
+]
 
 def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calculate distance in miles between two coordinates."""
@@ -219,6 +233,61 @@ def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
 @app.get("/map", response_class=HTMLResponse, name="map_page")
 def map_page(request: Request):
     return templates.TemplateResponse(request, "map.html")
+
+
+@app.get("/settings", response_class=HTMLResponse, name="settings_page")
+def settings_page(request: Request):
+    conn = get_connection(UI_DB_PATH)
+    pois = get_pois(conn)
+    conn.close()
+    for poi in pois:
+        poi["color"] = POI_COLORS[poi["color_index"] % len(POI_COLORS)]
+    return templates.TemplateResponse(request, "settings.html", {"pois": pois})
+
+
+@app.post("/settings/poi", name="add_poi")
+def add_poi(request: Request, name: str = Form(...), maps_url: str = Form(...)):
+    from starlette.responses import RedirectResponse
+    coords = extract_coords_from_url(maps_url)
+    if not coords or not name.strip():
+        return RedirectResponse(request.url_for("settings_page"), status_code=303)
+    lat, lng = coords
+    conn = get_connection(UI_DB_PATH)
+    existing_pois = get_pois(conn)
+    color_index = len(existing_pois) % len(POI_COLORS)
+    poi_id = insert_poi(conn, name.strip(), lat, lng, color_index)
+    conn.close()
+    # Trigger backfill in background
+    import threading
+    threading.Thread(target=_backfill_poi, args=(poi_id, lat, lng), daemon=True).start()
+    return RedirectResponse(request.url_for("settings_page"), status_code=303)
+
+
+@app.delete("/settings/poi/{poi_id}", name="delete_poi")
+def delete_poi_route(poi_id: int):
+    conn = get_connection(UI_DB_PATH)
+    delete_poi(conn, poi_id)
+    conn.close()
+    return {"ok": True}
+
+
+def _backfill_poi(poi_id: int, poi_lat: float, poi_lng: float) -> None:
+    """Background thread: fetch commute times for all listings missing this POI."""
+    import time
+    from scraper.commute import tfl_journey_mins
+    conn = get_connection(UI_DB_PATH)
+    rows = conn.execute(
+        """SELECT id, latitude, longitude FROM listings
+           WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+           AND id NOT IN (SELECT listing_id FROM poi_commutes WHERE poi_id = ?)""",
+        (poi_id,),
+    ).fetchall()
+    for row in rows:
+        mins = tfl_journey_mins(row["latitude"], row["longitude"], poi_lat, poi_lng)
+        if mins is not None:
+            upsert_poi_commute(conn, row["id"], poi_id, mins)
+        time.sleep(0.5)
+    conn.close()
 
 
 @app.get("/listing/{listing_id}", response_class=HTMLResponse, name="detail_page")

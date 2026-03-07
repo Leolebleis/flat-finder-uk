@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Settings - Flat Finder{% endblock %}
+{% block content %}
+
+<div class="settings">
+    <h1 class="settings__title">Places of Interest</h1>
+    <p class="settings__desc">Add locations to track commute times from each listing. Paste a Google Maps link to set the coordinates.</p>
+
+    <form class="settings__form" method="post" action="{{ request.url_for('add_poi') }}">
+        <div class="settings__field">
+            <label for="poi-name">Name</label>
+            <input type="text" id="poi-name" name="name" placeholder="e.g. Rue's, Gym" required>
+        </div>
+        <div class="settings__field settings__field--wide">
+            <label for="poi-url">Google Maps link</label>
+            <input type="url" id="poi-url" name="maps_url" placeholder="https://www.google.com/maps/..." required>
+        </div>
+        <button type="submit" class="btn-action btn-action--primary">Add</button>
+    </form>
+
+    {% if pois %}
+    <div class="settings__list">
+        {% for poi in pois %}
+        <div class="settings__poi" data-poi-id="{{ poi.id }}">
+            <span class="settings__poi-swatch" style="background: {{ poi.color.color }}"></span>
+            <span class="settings__poi-name">{{ poi.name }}</span>
+            <span class="settings__poi-coords">{{ "%.4f"|format(poi.lat) }}, {{ "%.4f"|format(poi.lng) }}</span>
+            <button class="settings__poi-delete" data-action="delete-poi" data-id="{{ poi.id }}" title="Remove">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="settings__empty">No places added yet. Add one above to start tracking commute times.</p>
+    {% endif %}
+</div>
+
+{% endblock %}
