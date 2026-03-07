@@ -10,6 +10,50 @@
         attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
+    // --- Zone overlays ---
+    var zoneLayer = L.layerGroup().addTo(map);
+    var zonesVisible = true;
+
+    fetch("/flat/api/zones")
+        .then(function (resp) {
+            if (!resp.ok) throw new Error("Failed to fetch zones");
+            return resp.json();
+        })
+        .then(function (zones) {
+            zones.forEach(function (zone) {
+                var geojson = JSON.parse(zone.geometry);
+                var color = zone.color ? zone.color.color : "#0f766e";
+                var layer = L.geoJSON(geojson, {
+                    style: {
+                        color: color,
+                        weight: 2,
+                        fillColor: color,
+                        fillOpacity: 0.12,
+                    },
+                });
+                layer.bindTooltip(zone.name, {
+                    permanent: true,
+                    direction: "center",
+                    className: "zone-label",
+                });
+                zoneLayer.addLayer(layer);
+            });
+        })
+        .catch(function (err) {
+            console.error("Error loading zones:", err);
+        });
+
+    window.toggleZones = function () {
+        zonesVisible = !zonesVisible;
+        if (zonesVisible) {
+            map.addLayer(zoneLayer);
+            document.getElementById("filter-zones").classList.add("active");
+        } else {
+            map.removeLayer(zoneLayer);
+            document.getElementById("filter-zones").classList.remove("active");
+        }
+    };
+
     // --- Key location markers (blue) ---
     var keyLocations = [
         { name: "Finchley Road Station", lat: 51.5472, lng: -0.1803 },
