@@ -3,13 +3,13 @@ import logging
 import re
 import time
 from pathlib import Path
-from shared.models import init_db, get_connection, insert_listing, get_state, set_state
+from shared.models import init_db, get_connection, insert_listing, get_state, set_state, get_pois, upsert_poi_commute
 from shared.config import (DB_PATH, MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM,
                            NTFY_TOPIC, GMAIL_ADDRESS, GMAIL_APP_PASSWORD,
                            load_zones)
 from scraper.rightmove import fetch_rightmove
 from scraper.openrent import fetch_openrent
-from scraper.commute import get_commute_mins, get_gym_commute_mins
+from scraper.commute import tfl_journey_mins
 from scraper.notifier import (format_ntfy_message, format_email_html,
                                send_ntfy, send_email,
                                format_failure_message, format_recovery_message)
@@ -122,36 +122,39 @@ def run() -> None:
 
     new_listings = process_new_listings(conn, all_listings)
 
-    # Fetch commute times for new listings with coordinates
+    # Load POIs from database
+    pois = get_pois(conn)
+
+    # Fetch commute times for new listings
     for listing in new_listings:
         if listing.get("latitude") and listing.get("longitude"):
-            mins = get_commute_mins(listing["latitude"], listing["longitude"])
-            if mins is not None:
-                listing["commute_mins"] = mins
-                conn.execute("UPDATE listings SET commute_mins = ? WHERE id = ?",
-                             (mins, listing["id"]))
-                conn.commit()
-            gym_mins = get_gym_commute_mins(listing["latitude"], listing["longitude"])
-            if gym_mins is not None:
-                listing["gym_commute_mins"] = gym_mins
-                conn.execute("UPDATE listings SET gym_commute_mins = ? WHERE id = ?",
-                             (gym_mins, listing["id"]))
-                conn.commit()
+            for poi in pois:
+                mins = tfl_journey_mins(listing["latitude"], listing["longitude"],
+                                        poi["lat"], poi["lng"])
+                if mins is not None:
+                    upsert_poi_commute(conn, listing["id"], poi["id"], mins)
+                time.sleep(0.5)
 
-    # Backfill gym commute for existing listings that don't have it yet
-    missing_gym = conn.execute(
-        "SELECT id, latitude, longitude FROM listings "
-        "WHERE gym_commute_mins IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL"
-    ).fetchall()
-    if missing_gym:
-        log.info(f"Backfilling gym commute for {len(missing_gym)} listings")
-        for row in missing_gym:
-            gym_mins = get_gym_commute_mins(row["latitude"], row["longitude"])
-            if gym_mins is not None:
-                conn.execute("UPDATE listings SET gym_commute_mins = ? WHERE id = ?",
-                             (gym_mins, row["id"]))
-                conn.commit()
-            time.sleep(0.5)  # Avoid TfL rate limiting
+    # Backfill: listings missing commute data for any POI
+    if pois:
+        for poi in pois:
+            missing = conn.execute(
+                """SELECT l.id, l.latitude, l.longitude FROM listings l
+                   WHERE l.latitude IS NOT NULL AND l.longitude IS NOT NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM poi_commutes pc
+                       WHERE pc.listing_id = l.id AND pc.poi_id = ?
+                   )""",
+                (poi["id"],),
+            ).fetchall()
+            if missing:
+                log.info(f"Backfilling '{poi['name']}' commute for {len(missing)} listings")
+                for row in missing:
+                    mins = tfl_journey_mins(row["latitude"], row["longitude"],
+                                            poi["lat"], poi["lng"])
+                    if mins is not None:
+                        upsert_poi_commute(conn, row["id"], poi["id"], mins)
+                    time.sleep(0.5)
 
     # Prune listings older than 2 weeks
     pruned = conn.execute(

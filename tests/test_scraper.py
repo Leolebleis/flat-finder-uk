@@ -14,7 +14,7 @@ def _make_listing(id="rightmove_1", price=1800):
         "description": "Nice flat", "image_url": None, "property_type": "flat",
         "furnishing": "Furnished", "sqft": None, "has_dishwasher": "unknown",
         "has_washer": "unknown", "has_outdoor": "unknown", "outdoor_type": None,
-        "zone": None, "commute_mins": None,
+        "zone": None, "commute_mins": None, "gym_commute_mins": None,
         "first_seen": "2026-02-26T12:00:00+00:00", "listing_date": None,
     }
 
@@ -99,3 +99,38 @@ def test_listing_fingerprint_none_when_missing_fields():
     l = _make_listing("rm_1")
     l["address"] = None
     assert _listing_fingerprint(l) is None
+
+
+def test_scraper_fetches_commutes_for_all_pois():
+    """run() should fetch commute times for each POI in the DB."""
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        init_db(db_path)
+        conn = get_connection(db_path)
+        from shared.models import insert_poi
+        poi_id = insert_poi(conn, "Test Place", 51.50, -0.12, 0)
+        conn.close()
+        listing = _make_listing("rm_new")
+        listing["latitude"] = 51.54
+        listing["longitude"] = -0.17
+        with patch("scraper.scraper.fetch_rightmove", return_value=[listing]), \
+             patch("scraper.scraper.fetch_openrent", return_value=[]), \
+             patch("scraper.scraper.load_zones", return_value=[{
+                 "name": "Test", "rightmove_id": "X", "openrent_term": "X",
+                 "radius_miles": 1.0, "lat": 51.54, "lng": -0.17
+             }]), \
+             patch("scraper.scraper.tfl_journey_mins", return_value=25) as mock_tfl, \
+             patch("scraper.scraper.DB_PATH", db_path), \
+             patch("scraper.scraper.NTFY_TOPIC", ""), \
+             patch("scraper.scraper.GMAIL_ADDRESS", ""), \
+             patch("scraper.scraper.GMAIL_APP_PASSWORD", ""):
+            from scraper.scraper import run
+            run()
+        conn = get_connection(db_path)
+        commutes = conn.execute(
+            "SELECT * FROM poi_commutes WHERE listing_id = 'rm_new'"
+        ).fetchall()
+        conn.close()
+        assert len(commutes) == 1
+        assert commutes[0]["poi_id"] == poi_id
+        assert commutes[0]["commute_mins"] == 25
