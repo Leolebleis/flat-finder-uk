@@ -152,66 +152,88 @@
   // --- Weight sliders & scoring ---
 
   function initWeightSliders() {
-    var commuteSlider = document.getElementById("w-commute");
-    var gymSlider = document.getElementById("w-gym");
-    if (!commuteSlider || !gymSlider) return;
+    var sliders = document.querySelectorAll(".poi-weight-slider");
+    if (!sliders.length) return;
 
-    var commuteVal = document.getElementById("w-commute-val");
-    var gymVal = document.getElementById("w-gym-val");
-
-    function syncSliders(source) {
-      var v = parseInt(source.value, 10);
-      if (source === commuteSlider) {
-        gymSlider.value = 100 - v;
-      } else {
-        commuteSlider.value = 100 - v;
-      }
-      commuteVal.textContent = commuteSlider.value + "%";
-      gymVal.textContent = gymSlider.value + "%";
-      recalcScores(parseInt(commuteSlider.value, 10) / 100, parseInt(gymSlider.value, 10) / 100);
-    }
-
-    commuteSlider.addEventListener("input", function () { syncSliders(commuteSlider); });
-    gymSlider.addEventListener("input", function () { syncSliders(gymSlider); });
+    sliders.forEach(function (slider) {
+      var valEl = document.getElementById(slider.id + "-val");
+      slider.addEventListener("input", function () {
+        if (valEl) valEl.textContent = slider.value + "%";
+        recalcScores();
+      });
+    });
   }
 
-  function recalcScores(wCommute, wGym) {
-    var cards = Array.from(document.querySelectorAll(".listing-card[data-commute-mins]"));
-    var commutes = [];
-    var gyms = [];
+  function recalcScores() {
+    var sliders = document.querySelectorAll(".poi-weight-slider");
+    if (!sliders.length) return;
 
-    cards.forEach(function (c) {
-      var cm = c.dataset.commuteMins;
-      var gd = c.dataset.gymCommute;
-      if (cm !== "") commutes.push(parseFloat(cm));
-      if (gd !== "") gyms.push(parseFloat(gd));
+    var weights = {};
+    var totalWeight = 0;
+    sliders.forEach(function (s) {
+      var w = parseInt(s.value, 10);
+      weights[s.dataset.poiId] = w;
+      totalWeight += w;
+    });
+    if (totalWeight === 0) totalWeight = 1;
+
+    var cards = Array.from(document.querySelectorAll(".listing-card"));
+    if (!cards.length) return;
+
+    // Collect min/max per POI across all cards
+    var stats = {};
+    Object.keys(weights).forEach(function (pid) {
+      var vals = [];
+      cards.forEach(function (c) {
+        var v = c.dataset["poi" + pid];
+        if (v !== undefined && v !== "") vals.push(parseFloat(v));
+      });
+      if (vals.length) {
+        var mn = Math.min.apply(null, vals);
+        var mx = Math.max.apply(null, vals);
+        stats[pid] = { min: mn, max: mx, range: mx !== mn ? mx - mn : 1 };
+      }
     });
 
-    if (commutes.length === 0 && gyms.length === 0) return;
-
-    var cMin = Math.min.apply(null, commutes), cMax = Math.max.apply(null, commutes);
-    var gMin = Math.min.apply(null, gyms), gMax = Math.max.apply(null, gyms);
-    var cRange = cMax !== cMin ? cMax - cMin : 1;
-    var gRange = gMax !== gMin ? gMax - gMin : 1;
-
     cards.forEach(function (c) {
-      var cm = c.dataset.commuteMins;
-      var gd = c.dataset.gymCommute;
-      var cScore = cm !== "" ? 100 * (1 - (parseFloat(cm) - cMin) / cRange) : 0;
-      var gScore = gd !== "" ? 100 * (1 - (parseFloat(gd) - gMin) / gRange) : 0;
-      var score = Math.round(wCommute * cScore + wGym * gScore);
+      var score = 0;
+      Object.keys(weights).forEach(function (pid) {
+        var v = c.dataset["poi" + pid];
+        if (v !== undefined && v !== "" && stats[pid]) {
+          var s = stats[pid];
+          var normalized = 100 * (1 - (parseFloat(v) - s.min) / s.range);
+          score += (weights[pid] / totalWeight) * normalized;
+        }
+      });
+      score = Math.round(score);
       c.dataset.matchScore = score;
       var badge = c.querySelector(".metric--score");
       if (badge) badge.textContent = score;
     });
 
-    // Re-sort cards in DOM
+    // Re-sort cards by score
     var grid = document.querySelector(".listing-grid");
     if (!grid) return;
     cards.sort(function (a, b) {
       return parseInt(b.dataset.matchScore, 10) - parseInt(a.dataset.matchScore, 10);
     });
     cards.forEach(function (c) { grid.appendChild(c); });
+  }
+
+  // --- Delete POI ---
+
+  function initDeletePoi() {
+    document.querySelectorAll("[data-action='delete-poi']").forEach(function (btn) {
+      btn.addEventListener("click", async function () {
+        var id = btn.dataset.id;
+        var resp = await fetch("/flat/settings/poi/" + id, {
+          method: "DELETE",
+        });
+        if (resp.ok) {
+          btn.closest(".settings__poi").remove();
+        }
+      });
+    });
   }
 
   // --- Clickable feature pills ---
@@ -266,5 +288,6 @@
     initFilters();
     initWeightSliders();
     initPillCycling();
+    initDeletePoi();
   });
 })();
