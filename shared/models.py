@@ -2,6 +2,8 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from shared.config import ZONES_FILE
+
 LISTINGS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
     id              TEXT PRIMARY KEY,
@@ -88,6 +90,7 @@ def init_db(db_path: Path) -> None:
         except sqlite3.OperationalError:
             pass  # Column already exists
     _migrate_legacy_commutes(conn)
+    _migrate_legacy_zones(conn)
     conn.commit()
     conn.close()
 
@@ -180,6 +183,31 @@ def _migrate_legacy_commutes(conn: sqlite3.Connection) -> None:
         "SELECT id, ?, gym_commute_mins FROM listings WHERE gym_commute_mins IS NOT NULL",
         (gym_id,),
     )
+
+
+def _migrate_legacy_zones(conn: sqlite3.Connection) -> None:
+    """Import zones from zones.json into DB if zones table is empty. Idempotent."""
+    count = conn.execute("SELECT COUNT(*) FROM zones").fetchone()[0]
+    if count > 0:
+        return
+    if not ZONES_FILE.exists():
+        return
+    import json as _json
+    from shared.zones import generate_circle_polygon
+    with open(ZONES_FILE) as f:
+        legacy_zones = _json.load(f)
+    now = datetime.now(timezone.utc).isoformat()
+    for i, z in enumerate(legacy_zones):
+        radius_km = z["radius_miles"] * 1.60934
+        geom = generate_circle_polygon(z["lat"], z["lng"], radius_km)
+        conn.execute(
+            """INSERT INTO zones (name, geometry, centroid_lat, centroid_lng,
+               covering_radius_km, rightmove_id, openrent_term, color_index, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (z["name"], _json.dumps(geom), z["lat"], z["lng"],
+             round(radius_km, 2), z.get("rightmove_id"), z.get("openrent_term"),
+             i % 8, now),
+        )
 
 
 def get_pois(conn: sqlite3.Connection) -> list[dict]:
