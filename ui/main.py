@@ -267,10 +267,13 @@ def map_page(request: Request):
 def settings_page(request: Request):
     conn = get_connection(UI_DB_PATH)
     pois = get_pois(conn)
+    zones = get_zones(conn)
     conn.close()
     for poi in pois:
         poi["color"] = POI_COLORS[poi["color_index"] % len(POI_COLORS)]
-    return templates.TemplateResponse(request, "settings.html", {"pois": pois})
+    for zone in zones:
+        zone["color"] = POI_COLORS[zone["color_index"] % len(POI_COLORS)]
+    return templates.TemplateResponse(request, "settings.html", {"pois": pois, "zones": zones})
 
 
 @app.post("/settings/poi", name="add_poi")

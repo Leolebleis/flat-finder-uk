@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Settings - Flat Finder{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.4/dist/leaflet-geoman.css" />
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.4/dist/leaflet-geoman.min.js"></script>
+{% endblock %}
 {% block content %}
 
 <div class="settings">
@@ -34,6 +40,276 @@
     {% else %}
     <p class="settings__empty">No places added yet. Add one above to start tracking commute times.</p>
     {% endif %}
+
+    <h1 class="settings__title settings__title--zones">Search Zones</h1>
+    <p class="settings__desc">Draw polygons on the map to define where to search for listings. Results outside your drawn zones are filtered out.</p>
+
+    <div class="settings__zone-list" id="zone-list">
+        {% for zone in zones %}
+        <div class="settings__zone" data-zone-id="{{ zone.id }}">
+            <span class="settings__zone-swatch" style="background: {{ zone.color.color }}"></span>
+            <div class="settings__zone-info">
+                <span class="settings__zone-name">{{ zone.name }}</span>
+                <span class="settings__zone-meta">{{ zone.openrent_term or 'pending' }} · {{ zone.rightmove_id or 'pending' }}</span>
+            </div>
+            <button class="settings__zone-edit" data-action="edit-zone" data-id="{{ zone.id }}" title="Edit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button class="settings__zone-delete" data-action="delete-zone" data-id="{{ zone.id }}" title="Remove">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% if not zones %}
+    <p class="settings__empty" id="zone-empty">No search zones defined. Add one below to start filtering listings by area.</p>
+    {% endif %}
+
+    <button class="btn-action btn-action--primary settings__add-zone" id="add-zone-btn" type="button">Add Zone</button>
+
+    <div class="zone-editor" id="zone-editor" style="display:none;">
+        <div class="zone-editor__header">
+            <div class="settings__field">
+                <label for="zone-name">Zone name</label>
+                <input type="text" id="zone-name" placeholder="e.g. Finchley Road area" required>
+            </div>
+            <div class="zone-editor__actions">
+                <button type="button" class="btn-action" id="zone-cancel-btn">Cancel</button>
+                <button type="button" class="btn-action btn-action--primary" id="zone-save-btn" disabled>Save</button>
+            </div>
+        </div>
+        <div id="zone-map" class="zone-editor__map"></div>
+        <p class="zone-editor__hint">Click on the map to place vertices. Click the first vertex to close the shape.</p>
+    </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    "use strict";
+
+    var zoneMap = null;
+    var drawnLayer = null;
+    var editingZoneId = null;
+    var existingZoneLayers = [];
+
+    var editorEl = document.getElementById("zone-editor");
+    var addBtn = document.getElementById("add-zone-btn");
+    var saveBtn = document.getElementById("zone-save-btn");
+    var cancelBtn = document.getElementById("zone-cancel-btn");
+    var nameInput = document.getElementById("zone-name");
+    var zoneList = document.getElementById("zone-list");
+    var zoneEmpty = document.getElementById("zone-empty");
+
+    // Color palette matching POI_COLORS
+    var ZONE_COLORS = [
+        {color: "#1d4ed8", bg: "#dbeafe"},
+        {color: "#c2410c", bg: "#ffedd5"},
+        {color: "#7c3aed", bg: "#ede9fe"},
+        {color: "#0f766e", bg: "#ccfbf1"},
+        {color: "#be123c", bg: "#ffe4e6"},
+        {color: "#b45309", bg: "#fef3c7"},
+        {color: "#047857", bg: "#d1fae5"},
+        {color: "#475569", bg: "#f1f5f9"},
+    ];
+
+    function initMap() {
+        if (zoneMap) return;
+        zoneMap = L.map("zone-map").setView([51.5472, -0.1803], 13);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors",
+        }).addTo(zoneMap);
+
+        // Load existing zones as non-editable layers
+        loadExistingZones();
+
+        // Enable polygon drawing
+        zoneMap.pm.addControls({
+            position: "topleft",
+            drawCircle: false,
+            drawCircleMarker: false,
+            drawMarker: false,
+            drawPolyline: false,
+            drawRectangle: false,
+            drawText: false,
+            editMode: false,
+            dragMode: false,
+            cutPolygon: false,
+            removalMode: false,
+            rotateMode: false,
+        });
+
+        zoneMap.on("pm:create", function(e) {
+            // Only allow one polygon at a time
+            if (drawnLayer) {
+                zoneMap.removeLayer(drawnLayer);
+            }
+            drawnLayer = e.layer;
+            saveBtn.disabled = false;
+            // Disable further drawing
+            zoneMap.pm.disableDraw();
+        });
+    }
+
+    function loadExistingZones() {
+        existingZoneLayers.forEach(function(l) { zoneMap.removeLayer(l); });
+        existingZoneLayers = [];
+        fetch("/flat/api/zones")
+            .then(function(r) { return r.json(); })
+            .then(function(zones) {
+                zones.forEach(function(z) {
+                    if (z.id === editingZoneId) return;
+                    var geojson = JSON.parse(z.geometry);
+                    var color = z.color ? z.color.color : "#0f766e";
+                    var layer = L.geoJSON(geojson, {
+                        style: { color: color, weight: 2, fillColor: color, fillOpacity: 0.15 }
+                    });
+                    layer.bindTooltip(z.name, { permanent: true, direction: "center", className: "zone-map-label" });
+                    layer.addTo(zoneMap);
+                    existingZoneLayers.push(layer);
+                });
+            });
+    }
+
+    function openEditor(zoneData) {
+        editorEl.style.display = "block";
+        addBtn.style.display = "none";
+        saveBtn.disabled = true;
+        drawnLayer = null;
+
+        setTimeout(function() {
+            initMap();
+            zoneMap.invalidateSize();
+
+            if (zoneData) {
+                // Edit mode: load existing polygon
+                editingZoneId = zoneData.id;
+                nameInput.value = zoneData.name;
+                var geojson = JSON.parse(zoneData.geometry);
+                drawnLayer = L.geoJSON(geojson, {
+                    style: { color: "#0f766e", weight: 2, fillColor: "#0f766e", fillOpacity: 0.2 }
+                }).addTo(zoneMap);
+                // Fit map to polygon
+                zoneMap.fitBounds(drawnLayer.getBounds(), { padding: [40, 40] });
+                // Enable editing on the layer
+                drawnLayer.eachLayer(function(l) { l.pm.enable(); });
+                saveBtn.disabled = false;
+                // Reload other zones (excluding this one)
+                loadExistingZones();
+            } else {
+                editingZoneId = null;
+                nameInput.value = "";
+                loadExistingZones();
+                // Start polygon draw mode
+                zoneMap.pm.enableDraw("Polygon", { snappable: true });
+            }
+        }, 50);
+    }
+
+    function closeEditor() {
+        editorEl.style.display = "none";
+        addBtn.style.display = "";
+        if (drawnLayer) {
+            zoneMap.removeLayer(drawnLayer);
+            drawnLayer = null;
+        }
+        editingZoneId = null;
+        nameInput.value = "";
+        zoneMap.pm.disableDraw();
+    }
+
+    function getDrawnGeoJSON() {
+        if (!drawnLayer) return null;
+        // drawnLayer might be a GeoJSON FeatureGroup (from edit) or a single layer (from draw)
+        if (typeof drawnLayer.toGeoJSON === "function") {
+            var gj = drawnLayer.toGeoJSON();
+            // Handle FeatureCollection (from L.geoJSON)
+            if (gj.type === "FeatureCollection" && gj.features.length > 0) {
+                return gj.features[0].geometry;
+            }
+            if (gj.type === "Feature") return gj.geometry;
+            return gj;
+        }
+        return null;
+    }
+
+    addBtn.addEventListener("click", function() {
+        openEditor(null);
+    });
+
+    cancelBtn.addEventListener("click", function() {
+        closeEditor();
+    });
+
+    saveBtn.addEventListener("click", async function() {
+        var name = nameInput.value.trim();
+        if (!name) { nameInput.focus(); return; }
+        var geometry = getDrawnGeoJSON();
+        if (!geometry) return;
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+
+        var url = editingZoneId ? "/flat/api/zones/" + editingZoneId : "/flat/api/zones";
+        var method = editingZoneId ? "PUT" : "POST";
+
+        try {
+            var resp = await fetch(url, {
+                method: method,
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ name: name, geometry: geometry }),
+            });
+            if (resp.ok) {
+                // Reload page to show updated zone list
+                window.location.reload();
+            } else {
+                var err = await resp.json();
+                alert("Error: " + (err.detail || "Failed to save zone"));
+            }
+        } catch(e) {
+            alert("Network error: " + e.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Save";
+        }
+    });
+
+    // Delete zone handler
+    document.querySelectorAll("[data-action='delete-zone']").forEach(function(btn) {
+        btn.addEventListener("click", async function() {
+            var id = btn.dataset.id;
+            var resp = await fetch("/flat/api/zones/" + id, { method: "DELETE" });
+            if (resp.ok) {
+                btn.closest(".settings__zone").remove();
+                var remaining = document.querySelectorAll(".settings__zone");
+                if (remaining.length === 0 && zoneEmpty) {
+                    zoneEmpty.style.display = "";
+                } else if (remaining.length === 0) {
+                    var p = document.createElement("p");
+                    p.className = "settings__empty";
+                    p.id = "zone-empty";
+                    p.textContent = "No search zones defined. Add one below to start filtering listings by area.";
+                    zoneList.after(p);
+                }
+            }
+        });
+    });
+
+    // Edit zone handler
+    document.querySelectorAll("[data-action='edit-zone']").forEach(function(btn) {
+        btn.addEventListener("click", async function() {
+            var id = parseInt(btn.dataset.id);
+            var resp = await fetch("/flat/api/zones");
+            if (!resp.ok) return;
+            var zones = await resp.json();
+            var zone = zones.find(function(z) { return z.id === id; });
+            if (zone) openEditor(zone);
+        });
+    });
+
+})();
+</script>
 {% endblock %}
