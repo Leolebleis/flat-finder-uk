@@ -57,6 +57,21 @@ CREATE TABLE IF NOT EXISTS poi_commutes (
 );
 """
 
+ZONES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS zones (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                TEXT NOT NULL,
+    geometry            TEXT NOT NULL,
+    centroid_lat        REAL NOT NULL,
+    centroid_lng        REAL NOT NULL,
+    covering_radius_km  REAL NOT NULL,
+    rightmove_id        TEXT,
+    openrent_term       TEXT,
+    color_index         INTEGER NOT NULL,
+    created_at          TEXT NOT NULL
+);
+"""
+
 def init_db(db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL")
@@ -64,6 +79,7 @@ def init_db(db_path: Path) -> None:
     conn.execute(SCRAPER_STATE_SCHEMA)
     conn.execute(POIS_SCHEMA)
     conn.execute(POI_COMMUTES_SCHEMA)
+    conn.execute(ZONES_SCHEMA)
     # Migrate existing databases: add new columns if missing
     for col, col_type in [("zone", "TEXT"), ("commute_mins", "INTEGER"),
                           ("gym_commute_mins", "INTEGER")]:
@@ -214,4 +230,49 @@ def upsert_poi_commute(conn: sqlite3.Connection, listing_id: str, poi_id: int, c
         "INSERT OR REPLACE INTO poi_commutes (listing_id, poi_id, commute_mins) VALUES (?, ?, ?)",
         (listing_id, poi_id, commute_mins),
     )
+    conn.commit()
+
+
+# --- Zone helpers ---
+
+def get_zones(conn: sqlite3.Connection) -> list[dict]:
+    """Return all zones ordered by id."""
+    rows = conn.execute("SELECT * FROM zones ORDER BY id").fetchall()
+    return [dict(row) for row in rows]
+
+
+def insert_zone(conn: sqlite3.Connection, name: str, geometry: str,
+                centroid_lat: float, centroid_lng: float,
+                covering_radius_km: float,
+                rightmove_id: str | None, openrent_term: str | None,
+                color_index: int) -> int:
+    """Insert a new zone and return its id."""
+    created_at = datetime.now(timezone.utc).isoformat()
+    cursor = conn.execute(
+        """INSERT INTO zones (name, geometry, centroid_lat, centroid_lng,
+           covering_radius_km, rightmove_id, openrent_term, color_index, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (name, geometry, centroid_lat, centroid_lng,
+         covering_radius_km, rightmove_id, openrent_term, color_index, created_at),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+def update_zone(conn: sqlite3.Connection, zone_id: int, **kwargs) -> None:
+    """Update zone fields. Pass only the fields to update."""
+    allowed = {"name", "geometry", "centroid_lat", "centroid_lng",
+               "covering_radius_km", "rightmove_id", "openrent_term"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    conn.execute(f"UPDATE zones SET {set_clause} WHERE id = ?",
+                 [*fields.values(), zone_id])
+    conn.commit()
+
+
+def delete_zone(conn: sqlite3.Connection, zone_id: int) -> None:
+    """Delete a zone."""
+    conn.execute("DELETE FROM zones WHERE id = ?", (zone_id,))
     conn.commit()

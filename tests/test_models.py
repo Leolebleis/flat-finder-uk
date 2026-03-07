@@ -9,6 +9,10 @@ from shared.models import (
     delete_poi,
     get_poi_commutes_for_listings,
     upsert_poi_commute,
+    get_zones,
+    insert_zone,
+    update_zone,
+    delete_zone,
 )
 
 def test_init_db_creates_listings_table():
@@ -192,4 +196,76 @@ def test_get_poi_commutes_empty_list():
         conn.row_factory = sqlite3.Row
         result = get_poi_commutes_for_listings(conn, [])
         assert result == {}
+        conn.close()
+
+SAMPLE_GEOMETRY = '{"type":"Polygon","coordinates":[[[-0.19,51.54],[-0.17,51.54],[-0.17,51.55],[-0.19,51.55],[-0.19,51.54]]]}'
+
+def test_init_db_creates_zones_table():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        init_db(db_path)
+        conn = sqlite3.connect(db_path)
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='zones'")
+        assert cursor.fetchone() is not None
+        conn.close()
+
+def test_insert_and_get_zones():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        init_db(db_path)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        zone_id = insert_zone(conn, "NW6 Area", SAMPLE_GEOMETRY,
+                              centroid_lat=51.545, centroid_lng=-0.18,
+                              covering_radius_km=1.2,
+                              rightmove_id="OUTCODE^1862",
+                              openrent_term="NW6",
+                              color_index=0)
+        assert isinstance(zone_id, int)
+        zones = get_zones(conn)
+        assert len(zones) == 1
+        assert zones[0]["name"] == "NW6 Area"
+        assert zones[0]["geometry"] == SAMPLE_GEOMETRY
+        assert zones[0]["centroid_lat"] == 51.545
+        assert zones[0]["covering_radius_km"] == 1.2
+        assert zones[0]["rightmove_id"] == "OUTCODE^1862"
+        conn.close()
+
+def test_update_zone():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        init_db(db_path)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        zone_id = insert_zone(conn, "Old Name", SAMPLE_GEOMETRY,
+                              centroid_lat=51.545, centroid_lng=-0.18,
+                              covering_radius_km=1.2,
+                              rightmove_id="OUTCODE^1862",
+                              openrent_term="NW6",
+                              color_index=0)
+        new_geom = SAMPLE_GEOMETRY.replace("51.54", "51.55")
+        update_zone(conn, zone_id, name="New Name", geometry=new_geom,
+                    centroid_lat=51.55, centroid_lng=-0.18,
+                    covering_radius_km=1.5,
+                    rightmove_id="OUTCODE^1862",
+                    openrent_term="NW6")
+        zones = get_zones(conn)
+        assert zones[0]["name"] == "New Name"
+        assert zones[0]["covering_radius_km"] == 1.5
+        conn.close()
+
+def test_delete_zone():
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        db_path = Path(f.name)
+        init_db(db_path)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        zone_id = insert_zone(conn, "Test", SAMPLE_GEOMETRY,
+                              centroid_lat=51.545, centroid_lng=-0.18,
+                              covering_radius_km=1.2,
+                              rightmove_id="OUTCODE^1862",
+                              openrent_term="NW6",
+                              color_index=0)
+        delete_zone(conn, zone_id)
+        assert len(get_zones(conn)) == 0
         conn.close()
