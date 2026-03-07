@@ -163,7 +163,8 @@ def run() -> None:
         log.info(f"Found {len(new_listings)} new listings")
         if NTFY_TOPIC:
             title, body = format_ntfy_message(new_listings)
-            _notify_safe(send_ntfy, NTFY_TOPIC, title, body)
+            click_url = new_listings[0].get("url")
+            _notify_safe(send_ntfy, NTFY_TOPIC, title, body, click_url=click_url)
         if GMAIL_ADDRESS and GMAIL_APP_PASSWORD:
             html = format_email_html(new_listings)
             _notify_safe(send_email, GMAIL_ADDRESS, GMAIL_APP_PASSWORD,
