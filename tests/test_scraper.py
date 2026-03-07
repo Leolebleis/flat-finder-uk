@@ -103,22 +103,33 @@ def test_listing_fingerprint_none_when_missing_fields():
 
 def test_scraper_fetches_commutes_for_all_pois():
     """run() should fetch commute times for each POI in the DB."""
+    import json as _json
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
         init_db(db_path)
         conn = get_connection(db_path)
-        from shared.models import insert_poi
+        from shared.models import insert_poi, insert_zone
         poi_id = insert_poi(conn, "Test Place", 51.50, -0.12, 0)
+        # Insert a zone that covers the listing location
+        zone_geom = _json.dumps({
+            "type": "Polygon",
+            "coordinates": [[
+                [-0.20, 51.50], [-0.10, 51.50],
+                [-0.10, 51.60], [-0.20, 51.60],
+                [-0.20, 51.50]
+            ]]
+        })
+        insert_zone(conn, "Test Zone", zone_geom,
+                     centroid_lat=51.55, centroid_lng=-0.15,
+                     covering_radius_km=5.0,
+                     rightmove_id="X", openrent_term="X",
+                     color_index=0)
         conn.close()
         listing = _make_listing("rm_new")
         listing["latitude"] = 51.54
         listing["longitude"] = -0.17
         with patch("scraper.scraper.fetch_rightmove", return_value=[listing]), \
              patch("scraper.scraper.fetch_openrent", return_value=[]), \
-             patch("scraper.scraper.load_zones", return_value=[{
-                 "name": "Test", "rightmove_id": "X", "openrent_term": "X",
-                 "radius_miles": 1.0, "lat": 51.54, "lng": -0.17
-             }]), \
              patch("scraper.scraper.tfl_journey_mins", return_value=25) as mock_tfl, \
              patch("scraper.scraper.DB_PATH", db_path), \
              patch("scraper.scraper.NTFY_TOPIC", ""), \
@@ -134,3 +145,43 @@ def test_scraper_fetches_commutes_for_all_pois():
         assert len(commutes) == 1
         assert commutes[0]["poi_id"] == poi_id
         assert commutes[0]["commute_mins"] == 25
+
+
+import json
+from scraper.scraper import _filter_listings_by_zone
+
+ZONE_GEOM = json.dumps({
+    "type": "Polygon",
+    "coordinates": [[
+        [-0.19, 51.54], [-0.17, 51.54],
+        [-0.17, 51.56], [-0.19, 51.56],
+        [-0.19, 51.54]
+    ]]
+})
+
+
+def test_filter_listings_keeps_inside():
+    listings = [_make_listing("rm_1")]
+    listings[0]["latitude"] = 51.55
+    listings[0]["longitude"] = -0.18
+    zone = {"geometry": ZONE_GEOM}
+    result = _filter_listings_by_zone(listings, zone)
+    assert len(result) == 1
+
+
+def test_filter_listings_removes_outside():
+    listings = [_make_listing("rm_1")]
+    listings[0]["latitude"] = 52.0
+    listings[0]["longitude"] = -0.18
+    zone = {"geometry": ZONE_GEOM}
+    result = _filter_listings_by_zone(listings, zone)
+    assert len(result) == 0
+
+
+def test_filter_listings_keeps_no_coordinates():
+    listings = [_make_listing("rm_1")]
+    listings[0]["latitude"] = None
+    listings[0]["longitude"] = None
+    zone = {"geometry": ZONE_GEOM}
+    result = _filter_listings_by_zone(listings, zone)
+    assert len(result) == 1
