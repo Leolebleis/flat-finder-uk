@@ -11,7 +11,7 @@ services:
       - FLAT_FINDER_UI_DB=/app/data/flat_finder.db
     networks:
       - default
-      - flat-finder-net
+      - pi-net
 
   flat-finder-scraper:
     build:
@@ -31,5 +31,5 @@ volumes:
   flat-finder-data:
 
 networks:
-  flat-finder-net:
+  pi-net:
     external: true
