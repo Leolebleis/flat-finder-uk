@@ -91,7 +91,7 @@
             </div>
 
             {% if l.first_seen %}
-            <time class="listing-card__date">{{ l.first_seen[:10].split('-') | reverse | join('/') }}</time>
+            <time class="listing-card__date">{{ l.first_seen[:10].split('-') | reverse | join('/') }}{% if l.first_seen | length > 15 %} {{ l.first_seen[11:16] }}{% endif %}</time>
             {% endif %}
 
             <div class="listing-card__specs">
@@ -119,16 +119,16 @@
                 {{ feature_pill(l.has_outdoor, l.outdoor_type or "Outdoor", "No outdoor", "Outdoor?") }}
             </div>
 
-            <div class="listing-card__footer">
-                <a class="listing-card__detail-link" href="{{ request.url_for('detail_page', listing_id=l.id) }}">View details &rarr;</a>
-                <a class="listing-card__source-link" href="{{ l.url }}" target="_blank" rel="noopener">Source &nearr;</a>
-            </div>
-
             <textarea class="listing-card__notes"
                       data-action="save-notes"
                       data-id="{{ l.id }}"
                       placeholder="Notes..."
                       rows="1">{{ l.notes or "" }}</textarea>
+
+            <div class="listing-card__footer">
+                <a class="listing-card__detail-link" href="{{ request.url_for('detail_page', listing_id=l.id) }}">View details &rarr;</a>
+                <a class="listing-card__source-link" href="{{ l.url }}" target="_blank" rel="noopener">Source &nearr;</a>
+            </div>
         </div>
     </article>
     {% endfor %}
