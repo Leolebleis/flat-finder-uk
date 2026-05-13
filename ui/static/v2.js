@@ -35,12 +35,6 @@
         btn.dataset.seen = String(newSeen);
         btn.classList.toggle("btn-seen--active", newSeen);
         btn.classList.toggle("btn-action--active", newSeen);
-
-        // Update button text on detail page
-        var textNode = btn.childNodes[btn.childNodes.length - 1];
-        if (textNode && textNode.nodeType === 3) {
-          textNode.textContent = newSeen ? " Seen" : " Mark seen";
-        }
         btn.title = newSeen ? "Seen" : "Mark as seen";
 
         // Update card visual state
@@ -50,10 +44,14 @@
           card.classList.toggle("listing-card--seen", newSeen);
         }
 
-        // Update detail page data attribute
+        // Update detail page
         var detail = btn.closest("[data-listing-id]");
         if (detail && !card) {
           detail.dataset.seen = String(newSeen);
+          var textNode = btn.childNodes[btn.childNodes.length - 1];
+          if (textNode && textNode.nodeType === 3) {
+            textNode.textContent = newSeen ? " Seen" : " Mark seen";
+          }
         }
 
         applyCurrentFilter();
@@ -80,22 +78,20 @@
         // Detail page fav button
         btn.classList.toggle("btn-action--fav-active", newFav);
 
-        // Update button text on detail page
-        var textNode = btn.childNodes[btn.childNodes.length - 1];
-        if (textNode && textNode.nodeType === 3) {
-          textNode.textContent = newFav ? " Saved" : " Save";
-        }
-
         // Update card data attribute
         var card = btn.closest(".listing-card");
         if (card) {
           card.dataset.favourite = String(newFav);
         }
 
-        // Update detail page data attribute
+        // Update detail page
         var detail = btn.closest("[data-listing-id]");
         if (detail && !card) {
           detail.dataset.favourite = String(newFav);
+          var textNode = btn.childNodes[btn.childNodes.length - 1];
+          if (textNode && textNode.nodeType === 3) {
+            textNode.textContent = newFav ? " Saved" : " Save";
+          }
         }
 
         applyCurrentFilter();

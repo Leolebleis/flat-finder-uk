@@ -24,7 +24,7 @@
 
 {% macro poi_metric(commute_mins, poi) %}
 <div class="metric-stacked">
-    <span class="metric-stacked__value" style="color: var(--poi-color-{{ poi.color_index % 8 }});">{{ commute_mins }}m</span>
+    <span class="metric-stacked__value" style="color: var(--poi-color-{{ poi.color_index % 8 }});">{{ commute_mins }} min</span>
     <span class="metric-stacked__label">{{ poi.name }}</span>
 </div>
 {% endmacro %}

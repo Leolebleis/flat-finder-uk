@@ -398,7 +398,7 @@ a:hover { text-decoration: underline; }
 .listing-card__fav--active { color: var(--fav); background: var(--fav-light); }
 
 @media (prefers-color-scheme: dark) {
-  .listing-card__fav { background: rgba(26,26,26,0.75); }
+  .listing-card__fav { background: rgba(40,40,38,0.8); color: #a8a29e; }
   .listing-card__fav--active { background: var(--fav-light); }
 }
 
