@@ -47,8 +47,11 @@ def _extract_listing_id(card: Tag) -> str | None:
     """Get listing ID from the carousel's data-listing-id attribute, or from the href."""
     carousel = card.select_one("[data-listing-id]")
     if carousel:
-        return carousel["data-listing-id"]
+        value = carousel.get("data-listing-id")
+        return value if isinstance(value, str) else None
     href = card.get("href", "")
+    if not isinstance(href, str):
+        return None
     match = re.search(r"/(\d+)$", href)
     return match.group(1) if match else None
 
@@ -95,7 +98,7 @@ def _extract_image_url(card: Tag) -> str | None:
         return None
     # Prefer data-src (real image) over src (may be placeholder)
     raw = img.get("data-src") or img.get("src", "")
-    if not raw or "NoImageImage" in raw:
+    if not isinstance(raw, str) or not raw or "NoImageImage" in raw:
         return None
     # Normalise protocol-relative URLs
     if raw.startswith("//"):

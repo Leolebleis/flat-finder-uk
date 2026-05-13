@@ -200,6 +200,9 @@ def insert_poi(conn: sqlite3.Connection, name: str, lat: float, lng: float, colo
         (name, lat, lng, color_index, created_at),
     )
     conn.commit()
+    if cursor.lastrowid is None:
+        msg = "INSERT did not produce a lastrowid"
+        raise RuntimeError(msg)
     return cursor.lastrowid
 
 
@@ -276,6 +279,9 @@ def insert_zone(  # noqa: PLR0913
         ),
     )
     conn.commit()
+    if cursor.lastrowid is None:
+        msg = "INSERT did not produce a lastrowid"
+        raise RuntimeError(msg)
     return cursor.lastrowid
 
 

@@ -1,5 +1,6 @@
 import json
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -37,7 +38,7 @@ def _make_listing(listing_id: str = "rightmove_1", price: int = 1800) -> dict:
         "zone": None,
         "commute_mins": None,
         "gym_commute_mins": None,
-        "first_seen": "2026-02-26T12:00:00+00:00",
+        "first_seen": datetime.now(UTC).isoformat(),
         "listing_date": None,
     }
 
