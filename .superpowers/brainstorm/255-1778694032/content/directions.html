@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flat Finder - Design Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Outfit:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0a0a0a;
+    color: #e5e5e5;
+    line-height: 1.5;
+    padding: 2rem;
+  }
+
+  .page-title {
+    text-align: center;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #fff;
+  }
+  .page-subtitle {
+    text-align: center;
+    color: #888;
+    margin-bottom: 2.5rem;
+    font-size: 0.95rem;
+  }
+
+  .directions {
+    display: flex;
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  .direction {
+    flex: 1;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+  .direction:hover { transform: translateY(-4px); }
+  .direction.selected {
+    box-shadow: 0 0 0 3px #3b82f6;
+  }
+
+  .dir-label {
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .dir-label h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  .dir-label p {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 2px;
+  }
+  .dir-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.85rem;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  /* --- Direction A: Modern & Sharp --- */
+  .dir-a { background: #111; border: 1px solid #222; }
+  .dir-a .dir-badge { background: #2563eb; }
+  .dir-a .dir-label { background: #111; border-bottom: 1px solid #222; }
+
+  .card-a {
+    margin: 1.25rem;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    font-family: 'Space Grotesk', sans-serif;
+    color: #0f172a;
+  }
+  .card-a .card-img {
+    width: 100%;
+    height: 180px;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    padding: 0.75rem;
+  }
+  .card-a .card-img::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.5), transparent 50%);
+  }
+  .card-a .card-img .price-tag {
+    position: relative;
+    z-index: 1;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.03em;
+  }
+  .card-a .card-img .price-tag small {
+    font-size: 0.55em;
+    font-weight: 500;
+    opacity: 0.8;
+  }
+  .card-a .card-img .score-badge {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: #22c55e;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    z-index: 1;
+  }
+  .card-a .card-img .fav-btn {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(8px);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    font-size: 1.1rem;
+    color: #94a3b8;
+  }
+
+  .card-a .card-body {
+    padding: 1rem 1.25rem 1.25rem;
+  }
+  .card-a .card-address {
+    font-size: 0.9rem;
+    color: #475569;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+  }
+  .card-a .card-specs {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-bottom: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .card-a .card-specs .dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #cbd5e1;
+  }
+  .card-a .card-metrics {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+  .card-a .metric-chip {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 5px;
+  }
+  .card-a .metric-chip.commute { background: #dbeafe; color: #1d4ed8; }
+  .card-a .metric-chip.station { background: #ede9fe; color: #7c3aed; }
+  .card-a .metric-chip.feature-yes { background: #dcfce7; color: #16a34a; }
+  .card-a .metric-chip.feature-no { background: #fee2e2; color: #dc2626; }
+  .card-a .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+  }
+  .card-a .card-footer a {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #2563eb;
+    text-decoration: none;
+  }
+  .card-a .card-footer .source {
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  /* --- Direction B: Minimal & Calm --- */
+  .dir-b { background: #111; border: 1px solid #222; }
+  .dir-b .dir-badge { background: #6b7280; }
+  .dir-b .dir-label { background: #111; border-bottom: 1px solid #222; }
+
+  .card-b {
+    margin: 1.25rem;
+    background: #fafaf9;
+    border-radius: 16px;
+    overflow: hidden;
+    font-family: 'Outfit', sans-serif;
+    color: #292524;
+  }
+  .card-b .card-img {
+    width: 100%;
+    height: 200px;
+    background: linear-gradient(135deg, #d6d3d1 0%, #e7e5e4 50%, #f5f5f4 100%);
+    position: relative;
+  }
+  .card-b .card-img .fav-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(12px);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: #a8a29e;
+  }
+
+  .card-b .card-body {
+    padding: 1.5rem;
+  }
+  .card-b .card-price {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #1c1917;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.25rem;
+  }
+  .card-b .card-price small {
+    font-size: 0.45em;
+    font-weight: 400;
+    color: #a8a29e;
+    margin-left: 0.15em;
+  }
+  .card-b .card-address {
+    font-size: 0.9rem;
+    color: #78716c;
+    font-weight: 400;
+    margin-bottom: 0.35rem;
+    line-height: 1.4;
+  }
+  .card-b .card-specs {
+    font-size: 0.82rem;
+    color: #a8a29e;
+    margin-bottom: 1.25rem;
+  }
+  .card-b .card-metrics {
+    display: flex;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+  .card-b .metric-item {
+    display: flex;
+    flex-direction: column;
+  }
+  .card-b .metric-item .metric-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #292524;
+  }
+  .card-b .metric-item .metric-label {
+    font-size: 0.72rem;
+    color: #a8a29e;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .card-b .card-pills {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .card-b .pill {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    border: 1px solid #e7e5e4;
+    color: #57534e;
+    background: transparent;
+  }
+  .card-b .pill.yes { border-color: #bbf7d0; color: #16a34a; background: #f0fdf4; }
+  .card-b .pill.no { border-color: #fecaca; color: #dc2626; background: #fef2f2; }
+
+  /* --- Direction C: Bold & Dark --- */
+  .dir-c { background: #111; border: 1px solid #222; }
+  .dir-c .dir-badge { background: #f97316; }
+  .dir-c .dir-label { background: #111; border-bottom: 1px solid #222; }
+
+  .card-c {
+    margin: 1.25rem;
+    background: #18181b;
+    border-radius: 16px;
+    overflow: hidden;
+    font-family: 'Sora', sans-serif;
+    color: #fafafa;
+    border: 1px solid #27272a;
+  }
+  .card-c .card-top {
+    display: flex;
+    gap: 0;
+  }
+  .card-c .card-img {
+    width: 120px;
+    min-height: 160px;
+    background: linear-gradient(135deg, #3f3f46 0%, #52525b 50%, #71717a 100%);
+    flex-shrink: 0;
+  }
+  .card-c .card-info {
+    padding: 1rem 1.25rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .card-c .card-price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.03em;
+  }
+  .card-c .card-price small {
+    font-size: 0.5em;
+    font-weight: 400;
+    color: #71717a;
+  }
+  .card-c .card-address {
+    font-size: 0.85rem;
+    color: #a1a1aa;
+    font-weight: 400;
+  }
+  .card-c .card-specs {
+    font-size: 0.78rem;
+    color: #52525b;
+  }
+  .card-c .card-score {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: auto;
+  }
+  .card-c .card-score .score-bar {
+    width: 60px;
+    height: 4px;
+    border-radius: 2px;
+    background: #27272a;
+    overflow: hidden;
+  }
+  .card-c .card-score .score-bar .fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #f97316, #eab308);
+    width: 78%;
+  }
+  .card-c .card-score .score-num {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #f97316;
+  }
+
+  .card-c .card-bottom {
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid #27272a;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .card-c .tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .card-c .tag.commute { background: #1e3a5f; color: #60a5fa; }
+  .card-c .tag.station { background: #312e81; color: #a78bfa; }
+  .card-c .tag.yes { background: #14532d; color: #4ade80; }
+  .card-c .tag.no { background: #450a0a; color: #f87171; }
+  .card-c .card-bottom .actions {
+    margin-left: auto;
+    display: flex;
+    gap: 0.5rem;
+  }
+  .card-c .card-bottom .action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #3f3f46;
+    background: transparent;
+    color: #71717a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+  }
+
+  /* Selection indicator */
+  .check-mark {
+    display: none;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #3b82f6;
+    color: #fff;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    z-index: 10;
+  }
+  .direction.selected .check-mark { display: flex; }
+
+  @media (max-width: 900px) {
+    .directions { flex-direction: column; }
+    .direction { max-width: 500px; margin: 0 auto; width: 100%; }
+    body { padding: 1.5rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">Pick a direction</h1>
+<p class="page-subtitle">Click to select. These are representative listing cards for each design language.</p>
+
+<div class="directions">
+
+  <!-- A: Modern & Sharp -->
+  <div class="direction dir-a" data-choice="a" onclick="selectDirection(this)">
+    <div class="check-mark">&#10003;</div>
+    <div class="dir-label">
+      <div class="dir-badge">A</div>
+      <div>
+        <h3>Modern & Sharp</h3>
+        <p>High contrast, bold type, blue accent. Premium but functional.</p>
+      </div>
+    </div>
+    <div class="card-a">
+      <div class="card-img">
+        <div class="fav-btn">&#9734;</div>
+        <div class="score-badge">78</div>
+        <div class="price-tag">&pound;1,850<small>/mo</small></div>
+      </div>
+      <div class="card-body">
+        <div class="card-address">23 Finchley Road, London NW3</div>
+        <div class="card-specs">
+          2 bed <span class="dot"></span> 58 m&sup2; <span class="dot"></span> Flat <span class="dot"></span> Furnished
+        </div>
+        <div class="card-metrics">
+          <span class="metric-chip commute">22 min to Work</span>
+          <span class="metric-chip station">0.3 mi stn</span>
+          <span class="metric-chip feature-yes">Dishwasher</span>
+          <span class="metric-chip feature-no">No outdoor</span>
+        </div>
+        <div class="card-footer">
+          <a href="#">View details &rarr;</a>
+          <span class="source">Rightmove</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: Minimal & Calm -->
+  <div class="direction dir-b" data-choice="b" onclick="selectDirection(this)">
+    <div class="check-mark">&#10003;</div>
+    <div class="dir-label">
+      <div class="dir-badge">B</div>
+      <div>
+        <h3>Minimal & Calm</h3>
+        <p>Warm stone tones, generous whitespace, quiet elegance.</p>
+      </div>
+    </div>
+    <div class="card-b">
+      <div class="card-img">
+        <div class="fav-btn">&#9734;</div>
+      </div>
+      <div class="card-body">
+        <div class="card-price">&pound;1,850<small>/mo</small></div>
+        <div class="card-address">23 Finchley Road, London NW3</div>
+        <div class="card-specs">2 bed &middot; 58 m&sup2; &middot; Flat &middot; Furnished</div>
+        <div class="card-metrics">
+          <div class="metric-item">
+            <span class="metric-value">22m</span>
+            <span class="metric-label">Work</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">0.3mi</span>
+            <span class="metric-label">Station</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">78</span>
+            <span class="metric-label">Score</span>
+          </div>
+        </div>
+        <div class="card-pills">
+          <span class="pill yes">Dishwasher</span>
+          <span class="pill yes">Washer</span>
+          <span class="pill no">No outdoor</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: Bold & Dark -->
+  <div class="direction dir-c" data-choice="c" onclick="selectDirection(this)">
+    <div class="check-mark">&#10003;</div>
+    <div class="dir-label">
+      <div class="dir-badge">C</div>
+      <div>
+        <h3>Bold & Dark</h3>
+        <p>Dark-first, compact, data-dense. Orange accent, horizontal cards.</p>
+      </div>
+    </div>
+    <div class="card-c">
+      <div class="card-top">
+        <div class="card-img"></div>
+        <div class="card-info">
+          <div class="card-price">&pound;1,850<small>/mo</small></div>
+          <div class="card-address">23 Finchley Road, NW3</div>
+          <div class="card-specs">2 bed &middot; 58 m&sup2; &middot; Furnished</div>
+          <div class="card-score">
+            <div class="score-bar"><div class="fill"></div></div>
+            <span class="score-num">78</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-bottom">
+        <span class="tag commute">22m Work</span>
+        <span class="tag station">0.3mi Stn</span>
+        <span class="tag yes">DW</span>
+        <span class="tag no">No outdoor</span>
+        <div class="actions">
+          <div class="action-btn">&#9734;</div>
+          <div class="action-btn">&#10003;</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function selectDirection(el) {
+  document.querySelectorAll('.direction').forEach(d => d.classList.remove('selected'));
+  el.classList.add('selected');
+}
+</script>
+</body>
+</html>

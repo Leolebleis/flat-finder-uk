@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flat Finder - Hybrid A+B</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0a0a0a;
+    color: #e5e5e5;
+    line-height: 1.5;
+    padding: 2rem;
+  }
+
+  .page-title {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+    color: #fff;
+  }
+  .page-subtitle {
+    text-align: center;
+    color: #888;
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+  }
+
+  .modes {
+    display: flex;
+    gap: 2.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  .mode-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .mode-label {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #666;
+    padding-bottom: 0.5rem;
+  }
+
+  /* ===== SHARED CARD STRUCTURE ===== */
+  .card {
+    border-radius: 14px;
+    overflow: hidden;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .card-img {
+    width: 100%;
+    height: 200px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-img::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to top, rgba(0,0,0,0.45), transparent);
+  }
+
+  .card-img .fav-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    font-size: 1.15rem;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+  }
+
+  .card-img .price-overlay {
+    position: absolute;
+    bottom: 0.85rem;
+    left: 1rem;
+    z-index: 2;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.03em;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.3);
+  }
+  .card-img .price-overlay small {
+    font-size: 0.5em;
+    font-weight: 500;
+    opacity: 0.85;
+  }
+
+  .card-img .score-badge {
+    position: absolute;
+    bottom: 0.85rem;
+    right: 0.85rem;
+    z-index: 2;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+  }
+
+  .card-body {
+    padding: 1.1rem 1.25rem 1.35rem;
+  }
+
+  .card-address {
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+    line-height: 1.35;
+  }
+  .card-date {
+    font-size: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+  .card-specs {
+    font-size: 0.82rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .card-metrics {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.85rem;
+  }
+  .metric-item {
+    display: flex;
+    flex-direction: column;
+  }
+  .metric-value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .metric-label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+  }
+
+  .card-pills {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+  }
+  .pill {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 5px;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.75rem;
+  }
+  .card-footer a {
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .card-footer .source {
+    font-size: 0.75rem;
+  }
+
+  /* ===== LIGHT MODE ===== */
+  .card.light {
+    background: #fff;
+    border: 1px solid #f0eeed;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  }
+  .card.light .card-img {
+    background: linear-gradient(135deg, #c9b8a8 0%, #d4c5b5 40%, #bfae9e 100%);
+  }
+  .card.light .fav-btn {
+    background: rgba(255,255,255,0.85);
+    color: #c4b5a3;
+  }
+  .card.light .score-badge {
+    background: #16a34a;
+    color: #fff;
+  }
+
+  .card.light .card-address { color: #1c1917; }
+  .card.light .card-date { color: #a8a29e; }
+  .card.light .card-specs { color: #78716c; }
+  .card.light .card-metrics { border-bottom: 1px solid #f5f3f1; }
+  .card.light .metric-value { color: #1c1917; }
+  .card.light .metric-label { color: #a8a29e; }
+  .card.light .pill.yes { background: #dcfce7; color: #16a34a; }
+  .card.light .pill.no { background: #fee2e2; color: #dc2626; }
+  .card.light .pill.unknown { background: #f3f4f6; color: #6b7280; }
+  .card.light .card-footer { border-top: 1px solid #f5f3f1; }
+  .card.light .card-footer a { color: #2563eb; }
+  .card.light .card-footer .source { color: #a8a29e; }
+
+  /* ===== DARK MODE ===== */
+  .card.dark {
+    background: #1a1a1a;
+    border: 1px solid #2a2a28;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.15);
+  }
+  .card.dark .card-img {
+    background: linear-gradient(135deg, #3a3530 0%, #4a4540 40%, #3f3a35 100%);
+  }
+  .card.dark .fav-btn {
+    background: rgba(30,30,28,0.75);
+    color: #6b6560;
+  }
+  .card.dark .score-badge {
+    background: #166534;
+    color: #86efac;
+  }
+
+  .card.dark .card-address { color: #f5f5f4; }
+  .card.dark .card-date { color: #6b6560; }
+  .card.dark .card-specs { color: #8a8580; }
+  .card.dark .card-metrics { border-bottom: 1px solid #2a2a28; }
+  .card.dark .metric-value { color: #f5f5f4; }
+  .card.dark .metric-label { color: #6b6560; }
+  .card.dark .pill.yes { background: #052e16; color: #4ade80; }
+  .card.dark .pill.no { background: #350a0a; color: #f87171; }
+  .card.dark .pill.unknown { background: #27272a; color: #71717a; }
+  .card.dark .card-footer { border-top: 1px solid #2a2a28; }
+  .card.dark .card-footer a { color: #60a5fa; }
+  .card.dark .card-footer .source { color: #6b6560; }
+
+  /* ===== TOOLBAR PREVIEW ===== */
+  .toolbar-preview {
+    border-radius: 10px;
+    padding: 0.65rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.82rem;
+  }
+  .toolbar-preview.light {
+    background: #fff;
+    border: 1px solid #f0eeed;
+    color: #78716c;
+  }
+  .toolbar-preview.dark {
+    background: #1a1a1a;
+    border: 1px solid #2a2a28;
+    color: #8a8580;
+  }
+  .seg {
+    display: inline-flex;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .seg span {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .seg.light span { background: #f5f3f1; color: #78716c; border: 1px solid #eae8e5; }
+  .seg.light span.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .seg.dark span { background: #252523; color: #6b6560; border: 1px solid #333; }
+  .seg.dark span.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+  .zone-chip {
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .zone-chip.light { border: 1px solid #e5e3e0; color: #78716c; }
+  .zone-chip.light.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .zone-chip.dark { border: 1px solid #3a3835; color: #6b6560; }
+  .zone-chip.dark.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+  .sort-mock {
+    margin-left: auto;
+    padding: 0.3rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .sort-mock.light { background: #f5f3f1; color: #78716c; border: 1px solid #eae8e5; }
+  .sort-mock.dark { background: #252523; color: #6b6560; border: 1px solid #333; }
+
+  /* Selection feedback */
+  .mode-col { cursor: pointer; position: relative; border-radius: 14px; padding: 0.5rem; transition: box-shadow 0.2s; }
+  .mode-col.selected { box-shadow: 0 0 0 2px #3b82f6; border-radius: 14px; }
+
+  .note {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #555;
+    margin-top: 2rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+  }
+  .note strong { color: #999; }
+
+  @media (max-width: 800px) {
+    .modes { flex-direction: column; }
+    .mode-col { max-width: 480px; margin: 0 auto; width: 100%; }
+    body { padding: 1.5rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">Hybrid A+B</h1>
+<p class="page-subtitle">A's bold pricing & sharpness + B's calm spacing & warm elegance. Both modes shown.</p>
+
+<div class="modes">
+
+  <!-- LIGHT MODE -->
+  <div class="mode-col" data-choice="light" onclick="selectMode(this)">
+    <div class="mode-label">Light Mode</div>
+
+    <div class="toolbar-preview light">
+      <div class="seg light">
+        <span class="active">All</span>
+        <span>Unseen</span>
+        <span>Favs</span>
+      </div>
+      <span class="zone-chip light active">All zones</span>
+      <span class="zone-chip light">Finchley</span>
+      <span class="zone-chip light">Camden</span>
+      <span class="sort-mock light">Score &#9662;</span>
+    </div>
+
+    <div class="card light">
+      <div class="card-img">
+        <div class="fav-btn">&#9734;</div>
+        <div class="price-overlay">&pound;1,850<small>/mo</small></div>
+        <div class="score-badge">78</div>
+      </div>
+      <div class="card-body">
+        <div class="card-address">23 Finchley Road, London NW3</div>
+        <div class="card-date">12/05/2026</div>
+        <div class="card-specs">2 bed &middot; 58 m&sup2; &middot; Flat &middot; Furnished</div>
+        <div class="card-metrics">
+          <div class="metric-item">
+            <span class="metric-value">22m</span>
+            <span class="metric-label">Work</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">35m</span>
+            <span class="metric-label">Gym</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">0.3mi</span>
+            <span class="metric-label">Station</span>
+          </div>
+        </div>
+        <div class="card-pills">
+          <span class="pill yes">Dishwasher</span>
+          <span class="pill yes">Washer</span>
+          <span class="pill no">No outdoor</span>
+        </div>
+        <div class="card-footer">
+          <a href="#">View details &rarr;</a>
+          <span class="source">Rightmove</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DARK MODE -->
+  <div class="mode-col" data-choice="dark" onclick="selectMode(this)">
+    <div class="mode-label">Dark Mode</div>
+
+    <div class="toolbar-preview dark">
+      <div class="seg dark">
+        <span class="active">All</span>
+        <span>Unseen</span>
+        <span>Favs</span>
+      </div>
+      <span class="zone-chip dark active">All zones</span>
+      <span class="zone-chip dark">Finchley</span>
+      <span class="zone-chip dark">Camden</span>
+      <span class="sort-mock dark">Score &#9662;</span>
+    </div>
+
+    <div class="card dark">
+      <div class="card-img">
+        <div class="fav-btn">&#9734;</div>
+        <div class="price-overlay">&pound;1,850<small>/mo</small></div>
+        <div class="score-badge">78</div>
+      </div>
+      <div class="card-body">
+        <div class="card-address">23 Finchley Road, London NW3</div>
+        <div class="card-date">12/05/2026</div>
+        <div class="card-specs">2 bed &middot; 58 m&sup2; &middot; Flat &middot; Furnished</div>
+        <div class="card-metrics">
+          <div class="metric-item">
+            <span class="metric-value">22m</span>
+            <span class="metric-label">Work</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">35m</span>
+            <span class="metric-label">Gym</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">0.3mi</span>
+            <span class="metric-label">Station</span>
+          </div>
+        </div>
+        <div class="card-pills">
+          <span class="pill yes">Dishwasher</span>
+          <span class="pill yes">Washer</span>
+          <span class="pill no">No outdoor</span>
+        </div>
+        <div class="card-footer">
+          <a href="#">View details &rarr;</a>
+          <span class="source">Rightmove</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="note">
+  <strong>Design language:</strong> Space Grotesk for prices/scores (sharp, numeric), Outfit for everything else (clean, friendly). Blue accent (#2563eb) for interactive elements. Warm neutrals for the light mode, true darks for dark mode. Metrics shown as stacked value/label pairs (from B). Price overlaid on image (from A).
+</p>
+
+<script>
+function selectMode(el) {
+  // Allow clicking to express preference, but both modes will ship
+  el.classList.toggle('selected');
+}
+</script>
+</body>
+</html>
