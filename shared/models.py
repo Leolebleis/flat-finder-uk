@@ -1,8 +1,7 @@
 import sqlite3
-from datetime import datetime, timezone
+from contextlib import suppress
+from datetime import UTC, datetime
 from pathlib import Path
-
-from shared.config import ZONES_FILE
 
 LISTINGS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
@@ -74,6 +73,7 @@ CREATE TABLE IF NOT EXISTS zones (
 );
 """
 
+
 def init_db(db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL")
@@ -83,21 +83,19 @@ def init_db(db_path: Path) -> None:
     conn.execute(POI_COMMUTES_SCHEMA)
     conn.execute(ZONES_SCHEMA)
     # Migrate existing databases: add new columns if missing
-    for col, col_type in [("zone", "TEXT"), ("commute_mins", "INTEGER"),
-                          ("gym_commute_mins", "INTEGER")]:
-        try:
+    for col, col_type in [("zone", "TEXT"), ("commute_mins", "INTEGER"), ("gym_commute_mins", "INTEGER")]:
+        with suppress(sqlite3.OperationalError):
             conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {col_type}")
-        except sqlite3.OperationalError:
-            pass  # Column already exists
     _migrate_legacy_commutes(conn)
-    _migrate_legacy_zones(conn)
     conn.commit()
     conn.close()
+
 
 def get_connection(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
+
 
 def insert_listing(conn: sqlite3.Connection, listing: dict) -> bool:
     """Insert a listing. Returns True if new, False if already existed."""
@@ -116,13 +114,13 @@ def insert_listing(conn: sqlite3.Connection, listing: dict) -> bool:
                :zone, :commute_mins, :gym_commute_mins, :first_seen, :listing_date)""",
             listing,
         )
-        conn.commit()
-        return True
     except sqlite3.IntegrityError:
         return False
+    conn.commit()
+    return True
 
-def get_listings(conn: sqlite3.Connection, since: str | None = None,
-                 limit: int = 50, offset: int = 0) -> list[dict]:
+
+def get_listings(conn: sqlite3.Connection, since: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:
     query = "SELECT * FROM listings"
     params: list = []
     if since:
@@ -133,9 +131,11 @@ def get_listings(conn: sqlite3.Connection, since: str | None = None,
     rows = conn.execute(query, params).fetchall()
     return [dict(row) for row in rows]
 
+
 def get_state(conn: sqlite3.Connection, key: str) -> str | None:
     row = conn.execute("SELECT value FROM scraper_state WHERE key = ?", (key,)).fetchone()
     return row["value"] if row else None
+
 
 def set_state(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.execute(
@@ -146,6 +146,7 @@ def set_state(conn: sqlite3.Connection, key: str, value: str) -> None:
 
 
 # --- POI helpers ---
+
 
 def _migrate_legacy_commutes(conn: sqlite3.Connection) -> None:
     """Seed Work and Gym POIs from legacy commute columns. Idempotent."""
@@ -159,7 +160,7 @@ def _migrate_legacy_commutes(conn: sqlite3.Connection) -> None:
     if has_legacy == 0:
         return  # No legacy data to migrate
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     conn.execute(
         "INSERT INTO pois (name, lat, lng, color_index, created_at) VALUES (?, ?, ?, ?, ?)",
         ("Work", 51.4869, -0.1832, 0, now),
@@ -185,31 +186,6 @@ def _migrate_legacy_commutes(conn: sqlite3.Connection) -> None:
     )
 
 
-def _migrate_legacy_zones(conn: sqlite3.Connection) -> None:
-    """Import zones from zones.json into DB if zones table is empty. Idempotent."""
-    count = conn.execute("SELECT COUNT(*) FROM zones").fetchone()[0]
-    if count > 0:
-        return
-    if not ZONES_FILE.exists():
-        return
-    import json as _json
-    from shared.zones import generate_circle_polygon
-    with open(ZONES_FILE) as f:
-        legacy_zones = _json.load(f)
-    now = datetime.now(timezone.utc).isoformat()
-    for i, z in enumerate(legacy_zones):
-        radius_km = z["radius_miles"] * 1.60934
-        geom = generate_circle_polygon(z["lat"], z["lng"], radius_km)
-        conn.execute(
-            """INSERT INTO zones (name, geometry, centroid_lat, centroid_lng,
-               covering_radius_km, rightmove_id, openrent_term, color_index, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (z["name"], _json.dumps(geom), z["lat"], z["lng"],
-             round(radius_km, 2), z.get("rightmove_id"), z.get("openrent_term"),
-             i % 8, now),
-        )
-
-
 def get_pois(conn: sqlite3.Connection) -> list[dict]:
     """Return all POIs ordered by id."""
     rows = conn.execute("SELECT * FROM pois ORDER BY id").fetchall()
@@ -218,12 +194,15 @@ def get_pois(conn: sqlite3.Connection) -> list[dict]:
 
 def insert_poi(conn: sqlite3.Connection, name: str, lat: float, lng: float, color_index: int) -> int:
     """Insert a new POI and return its id."""
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = datetime.now(UTC).isoformat()
     cursor = conn.execute(
         "INSERT INTO pois (name, lat, lng, color_index, created_at) VALUES (?, ?, ?, ?, ?)",
         (name, lat, lng, color_index, created_at),
     )
     conn.commit()
+    if cursor.lastrowid is None:
+        msg = "INSERT did not produce a lastrowid"
+        raise RuntimeError(msg)
     return cursor.lastrowid
 
 
@@ -240,7 +219,7 @@ def get_poi_commutes_for_listings(conn: sqlite3.Connection, listing_ids: list[st
         return {}
     placeholders = ",".join("?" for _ in listing_ids)
     rows = conn.execute(
-        f"SELECT listing_id, poi_id, commute_mins FROM poi_commutes WHERE listing_id IN ({placeholders})",
+        f"SELECT listing_id, poi_id, commute_mins FROM poi_commutes WHERE listing_id IN ({placeholders})",  # noqa: S608
         listing_ids,
     ).fetchall()
     result: dict[str, dict[int, int]] = {}
@@ -263,40 +242,65 @@ def upsert_poi_commute(conn: sqlite3.Connection, listing_id: str, poi_id: int, c
 
 # --- Zone helpers ---
 
+
 def get_zones(conn: sqlite3.Connection) -> list[dict]:
     """Return all zones ordered by id."""
     rows = conn.execute("SELECT * FROM zones ORDER BY id").fetchall()
     return [dict(row) for row in rows]
 
 
-def insert_zone(conn: sqlite3.Connection, name: str, geometry: str,
-                centroid_lat: float, centroid_lng: float,
-                covering_radius_km: float,
-                rightmove_id: str | None, openrent_term: str | None,
-                color_index: int) -> int:
+def insert_zone(  # noqa: PLR0913
+    conn: sqlite3.Connection,
+    name: str,
+    geometry: str,
+    centroid_lat: float,
+    centroid_lng: float,
+    covering_radius_km: float,
+    rightmove_id: str | None,
+    openrent_term: str | None,
+    color_index: int,
+) -> int:
     """Insert a new zone and return its id."""
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = datetime.now(UTC).isoformat()
     cursor = conn.execute(
         """INSERT INTO zones (name, geometry, centroid_lat, centroid_lng,
            covering_radius_km, rightmove_id, openrent_term, color_index, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (name, geometry, centroid_lat, centroid_lng,
-         covering_radius_km, rightmove_id, openrent_term, color_index, created_at),
+        (
+            name,
+            geometry,
+            centroid_lat,
+            centroid_lng,
+            covering_radius_km,
+            rightmove_id,
+            openrent_term,
+            color_index,
+            created_at,
+        ),
     )
     conn.commit()
+    if cursor.lastrowid is None:
+        msg = "INSERT did not produce a lastrowid"
+        raise RuntimeError(msg)
     return cursor.lastrowid
 
 
-def update_zone(conn: sqlite3.Connection, zone_id: int, **kwargs) -> None:
+def update_zone(conn: sqlite3.Connection, zone_id: int, **kwargs: object) -> None:
     """Update zone fields. Pass only the fields to update."""
-    allowed = {"name", "geometry", "centroid_lat", "centroid_lng",
-               "covering_radius_km", "rightmove_id", "openrent_term"}
+    allowed = {
+        "name",
+        "geometry",
+        "centroid_lat",
+        "centroid_lng",
+        "covering_radius_km",
+        "rightmove_id",
+        "openrent_term",
+    }
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return
     set_clause = ", ".join(f"{k} = ?" for k in fields)
-    conn.execute(f"UPDATE zones SET {set_clause} WHERE id = ?",
-                 [*fields.values(), zone_id])
+    conn.execute(f"UPDATE zones SET {set_clause} WHERE id = ?", [*fields.values(), zone_id])  # noqa: S608
     conn.commit()
 
 

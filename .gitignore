@@ -1,7 +1,12 @@
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
 .env
 *.db
-venv/
-.venv/
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
 .worktrees/

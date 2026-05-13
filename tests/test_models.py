@@ -2,18 +2,20 @@
 import sqlite3
 import tempfile
 from pathlib import Path
+
 from shared.models import (
-    init_db,
-    get_pois,
-    insert_poi,
     delete_poi,
+    delete_zone,
     get_poi_commutes_for_listings,
-    upsert_poi_commute,
+    get_pois,
     get_zones,
+    init_db,
+    insert_poi,
     insert_zone,
     update_zone,
-    delete_zone,
+    upsert_poi_commute,
 )
+
 
 def test_init_db_creates_listings_table():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -24,6 +26,7 @@ def test_init_db_creates_listings_table():
         assert cursor.fetchone() is not None
         conn.close()
 
+
 def test_init_db_creates_scraper_state_table():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -33,6 +36,7 @@ def test_init_db_creates_scraper_state_table():
         assert cursor.fetchone() is not None
         conn.close()
 
+
 def test_listings_table_has_expected_columns():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -40,13 +44,34 @@ def test_listings_table_has_expected_columns():
         conn = sqlite3.connect(db_path)
         cursor = conn.execute("PRAGMA table_info(listings)")
         columns = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "source", "url", "title", "price_pcm", "bedrooms",
-                    "address", "latitude", "longitude", "description", "image_url",
-                    "property_type", "furnishing", "sqft", "has_dishwasher",
-                    "has_washer", "has_outdoor", "outdoor_type", "zone", "commute_mins",
-                    "gym_commute_mins", "first_seen", "listing_date"}
+        expected = {
+            "id",
+            "source",
+            "url",
+            "title",
+            "price_pcm",
+            "bedrooms",
+            "address",
+            "latitude",
+            "longitude",
+            "description",
+            "image_url",
+            "property_type",
+            "furnishing",
+            "sqft",
+            "has_dishwasher",
+            "has_washer",
+            "has_outdoor",
+            "outdoor_type",
+            "zone",
+            "commute_mins",
+            "gym_commute_mins",
+            "first_seen",
+            "listing_date",
+        }
         assert expected == columns
         conn.close()
+
 
 def test_init_db_creates_pois_table():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -57,6 +82,7 @@ def test_init_db_creates_pois_table():
         assert cursor.fetchone() is not None
         conn.close()
 
+
 def test_init_db_creates_poi_commutes_table():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -65,6 +91,7 @@ def test_init_db_creates_poi_commutes_table():
         cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='poi_commutes'")
         assert cursor.fetchone() is not None
         conn.close()
+
 
 def test_migrate_seeds_pois_from_legacy_columns():
     """When pois table is empty but listings have commute_mins, seed Work and Gym POIs."""
@@ -94,6 +121,7 @@ def test_migrate_seeds_pois_from_legacy_columns():
         assert vals[pois[1]["id"]] == 12
         conn.close()
 
+
 def test_migrate_is_idempotent():
     """Running init_db multiple times after migration should not duplicate POIs."""
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -113,6 +141,7 @@ def test_migrate_is_idempotent():
         assert count == 2
         conn.close()
 
+
 def test_migrate_skips_when_no_legacy_data():
     """When no listings have commute data, no POIs should be seeded."""
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -122,6 +151,7 @@ def test_migrate_skips_when_no_legacy_data():
         count = conn.execute("SELECT COUNT(*) FROM pois").fetchone()[0]
         assert count == 0
         conn.close()
+
 
 def test_insert_and_get_pois():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -140,6 +170,7 @@ def test_insert_and_get_pois():
         assert pois[0]["created_at"] is not None
         conn.close()
 
+
 def test_delete_poi_cascades_commutes():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -153,6 +184,7 @@ def test_delete_poi_cascades_commutes():
         commutes = conn.execute("SELECT * FROM poi_commutes WHERE poi_id = ?", (poi_id,)).fetchall()
         assert len(commutes) == 0
         conn.close()
+
 
 def test_upsert_poi_commute_insert_and_update():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -169,6 +201,7 @@ def test_upsert_poi_commute_insert_and_update():
         result = get_poi_commutes_for_listings(conn, ["listing1"])
         assert result["listing1"][poi_id] == 30
         conn.close()
+
 
 def test_get_poi_commutes_for_multiple_listings():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -188,6 +221,7 @@ def test_get_poi_commutes_for_multiple_listings():
         assert "L3" not in result
         conn.close()
 
+
 def test_get_poi_commutes_empty_list():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -198,7 +232,11 @@ def test_get_poi_commutes_empty_list():
         assert result == {}
         conn.close()
 
-SAMPLE_GEOMETRY = '{"type":"Polygon","coordinates":[[[-0.19,51.54],[-0.17,51.54],[-0.17,51.55],[-0.19,51.55],[-0.19,51.54]]]}'
+
+SAMPLE_GEOMETRY = (
+    '{"type":"Polygon","coordinates":[[[-0.19,51.54],[-0.17,51.54],[-0.17,51.55],[-0.19,51.55],[-0.19,51.54]]]}'
+)
+
 
 def test_init_db_creates_zones_table():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -209,18 +247,24 @@ def test_init_db_creates_zones_table():
         assert cursor.fetchone() is not None
         conn.close()
 
+
 def test_insert_and_get_zones():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
         init_db(db_path)
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
-        zone_id = insert_zone(conn, "NW6 Area", SAMPLE_GEOMETRY,
-                              centroid_lat=51.545, centroid_lng=-0.18,
-                              covering_radius_km=1.2,
-                              rightmove_id="OUTCODE^1862",
-                              openrent_term="NW6",
-                              color_index=0)
+        zone_id = insert_zone(
+            conn,
+            "NW6 Area",
+            SAMPLE_GEOMETRY,
+            centroid_lat=51.545,
+            centroid_lng=-0.18,
+            covering_radius_km=1.2,
+            rightmove_id="OUTCODE^1862",
+            openrent_term="NW6",
+            color_index=0,
+        )
         assert isinstance(zone_id, int)
         zones = get_zones(conn)
         assert len(zones) == 1
@@ -231,28 +275,41 @@ def test_insert_and_get_zones():
         assert zones[0]["rightmove_id"] == "OUTCODE^1862"
         conn.close()
 
+
 def test_update_zone():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
         init_db(db_path)
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
-        zone_id = insert_zone(conn, "Old Name", SAMPLE_GEOMETRY,
-                              centroid_lat=51.545, centroid_lng=-0.18,
-                              covering_radius_km=1.2,
-                              rightmove_id="OUTCODE^1862",
-                              openrent_term="NW6",
-                              color_index=0)
+        zone_id = insert_zone(
+            conn,
+            "Old Name",
+            SAMPLE_GEOMETRY,
+            centroid_lat=51.545,
+            centroid_lng=-0.18,
+            covering_radius_km=1.2,
+            rightmove_id="OUTCODE^1862",
+            openrent_term="NW6",
+            color_index=0,
+        )
         new_geom = SAMPLE_GEOMETRY.replace("51.54", "51.55")
-        update_zone(conn, zone_id, name="New Name", geometry=new_geom,
-                    centroid_lat=51.55, centroid_lng=-0.18,
-                    covering_radius_km=1.5,
-                    rightmove_id="OUTCODE^1862",
-                    openrent_term="NW6")
+        update_zone(
+            conn,
+            zone_id,
+            name="New Name",
+            geometry=new_geom,
+            centroid_lat=51.55,
+            centroid_lng=-0.18,
+            covering_radius_km=1.5,
+            rightmove_id="OUTCODE^1862",
+            openrent_term="NW6",
+        )
         zones = get_zones(conn)
         assert zones[0]["name"] == "New Name"
         assert zones[0]["covering_radius_km"] == 1.5
         conn.close()
+
 
 def test_delete_zone():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -260,12 +317,17 @@ def test_delete_zone():
         init_db(db_path)
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
-        zone_id = insert_zone(conn, "Test", SAMPLE_GEOMETRY,
-                              centroid_lat=51.545, centroid_lng=-0.18,
-                              covering_radius_km=1.2,
-                              rightmove_id="OUTCODE^1862",
-                              openrent_term="NW6",
-                              color_index=0)
+        zone_id = insert_zone(
+            conn,
+            "Test",
+            SAMPLE_GEOMETRY,
+            centroid_lat=51.545,
+            centroid_lng=-0.18,
+            covering_radius_km=1.2,
+            rightmove_id="OUTCODE^1862",
+            openrent_term="NW6",
+            color_index=0,
+        )
         delete_zone(conn, zone_id)
         assert len(get_zones(conn)) == 0
         conn.close()

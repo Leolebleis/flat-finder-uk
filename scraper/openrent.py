@@ -1,9 +1,10 @@
 import re
-import requests
-from datetime import datetime, timezone
-from urllib.parse import urlencode, quote_plus
+from datetime import UTC, datetime
+from urllib.parse import quote_plus, urlencode
 
+import requests
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 
 from scraper.rightmove import _check_description
 
@@ -11,8 +12,7 @@ BASE_URL = "https://www.openrent.co.uk/properties-to-rent"
 EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
 
 
-def build_search_url(location: str, radius_km: int, min_beds: int,
-                     max_beds: int, max_price: int) -> str:
+def build_search_url(location: str, radius_km: int, min_beds: int, max_beds: int, max_price: int) -> str:
     """Build an OpenRent search URL from parameters."""
     params = {
         "term": location,
@@ -43,17 +43,20 @@ def _extract_coordinates(soup: BeautifulSoup) -> tuple[list[int], list[float], l
     return ids, lats, lngs
 
 
-def _extract_listing_id(card) -> str | None:
+def _extract_listing_id(card: Tag) -> str | None:
     """Get listing ID from the carousel's data-listing-id attribute, or from the href."""
     carousel = card.select_one("[data-listing-id]")
     if carousel:
-        return carousel["data-listing-id"]
+        value = carousel.get("data-listing-id")
+        return value if isinstance(value, str) else None
     href = card.get("href", "")
+    if not isinstance(href, str):
+        return None
     match = re.search(r"/(\d+)$", href)
     return match.group(1) if match else None
 
 
-def _extract_price(card) -> int | None:
+def _extract_price(card: Tag) -> int | None:
     """Extract monthly price from the pim div."""
     pim = card.select_one(".pim .fs-4.fw-medium.text-primary")
     if not pim:
@@ -64,7 +67,7 @@ def _extract_price(card) -> int | None:
     return int(cleaned) if cleaned else None
 
 
-def _extract_title(card) -> str | None:
+def _extract_title(card: Tag) -> str | None:
     """Extract the title from the main heading div."""
     title_div = card.select_one(".fw-medium.text-primary.fs-3")
     return title_div.get_text(strip=True) if title_div else None
@@ -82,20 +85,20 @@ def _extract_address(title: str | None) -> str | None:
     return parts[1] if len(parts) > 1 else title
 
 
-def _extract_description(card) -> str:
+def _extract_description(card: Tag) -> str:
     """Extract the description snippet from the listing card."""
     desc_div = card.select_one(".line-clamp-2")
     return desc_div.get_text(strip=True) if desc_div else ""
 
 
-def _extract_image_url(card) -> str | None:
+def _extract_image_url(card: Tag) -> str | None:
     """Extract the first property image URL, handling lazy-loaded images."""
     img = card.select_one("img.propertyPic")
     if not img:
         return None
     # Prefer data-src (real image) over src (may be placeholder)
     raw = img.get("data-src") or img.get("src", "")
-    if not raw or "NoImageImage" in raw:
+    if not isinstance(raw, str) or not raw or "NoImageImage" in raw:
         return None
     # Normalise protocol-relative URLs
     if raw.startswith("//"):
@@ -103,7 +106,7 @@ def _extract_image_url(card) -> str | None:
     return raw
 
 
-def _extract_bedrooms(card) -> int | None:
+def _extract_bedrooms(card: Tag) -> int | None:
     """Extract bedroom count from the features list."""
     items = card.select("ul.list-unstyled li")
     for li in items:
@@ -114,7 +117,7 @@ def _extract_bedrooms(card) -> int | None:
     return None
 
 
-def _extract_furnishing(card) -> str | None:
+def _extract_furnishing(card: Tag) -> str | None:
     """Extract furnishing info from the features list."""
     items = card.select("ul.list-unstyled li")
     for li in items:
@@ -128,7 +131,6 @@ def _extract_property_type(title: str | None) -> str | None:
     """Derive property type from the title prefix, e.g. '2 Bed Flat' -> 'Flat'."""
     if not title:
         return None
-    # Pattern: "<N> Bed <Type>," or "<Type>,"
     match = re.match(r"(?:\d+\s+Beds?\s+)?(.+?),", title)
     return match.group(1).strip() if match else None
 
@@ -183,7 +185,7 @@ def parse_openrent_html(html: str) -> list[dict]:
             "property_type": _extract_property_type(title),
             "furnishing": _extract_furnishing(card),
             "sqft": None,  # Not available on search page
-            "first_seen": datetime.now(timezone.utc).isoformat(),
+            "first_seen": datetime.now(UTC).isoformat(),
             "listing_date": None,  # Not reliably available on search page
             **desc_flags,
         }
@@ -192,13 +194,12 @@ def parse_openrent_html(html: str) -> list[dict]:
     return listings
 
 
-def fetch_openrent(location: str, radius_km: int, min_beds: int,
-                   max_beds: int, max_price: int) -> list[dict]:
+def fetch_openrent(location: str, radius_km: int, min_beds: int, max_beds: int, max_price: int) -> list[dict]:
     """Fetch and parse OpenRent search results."""
     url = build_search_url(location, radius_km, min_beds, max_beds, max_price)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     }
     resp = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
@@ -207,7 +208,8 @@ def fetch_openrent(location: str, radius_km: int, min_beds: int,
     # OpenRent doesn't always enforce server-side filters after redirect,
     # so enforce price and bedroom limits client-side
     return [
-        l for l in listings
-        if (l.get("price_pcm") is None or l["price_pcm"] <= max_price)
-        and (l.get("bedrooms") is None or min_beds <= l["bedrooms"] <= max_beds)
+        listing
+        for listing in listings
+        if (listing.get("price_pcm") is None or listing["price_pcm"] <= max_price)
+        and (listing.get("bedrooms") is None or min_beds <= listing["bedrooms"] <= max_beds)
     ]
