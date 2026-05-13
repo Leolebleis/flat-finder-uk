@@ -1,10 +1,12 @@
-# tests/test_ui.py
+import importlib
 import json
 import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import shared.config
+import ui.main
 from fastapi.testclient import TestClient
 from shared.models import (
     get_connection,
@@ -57,13 +59,7 @@ SAMPLE_LISTING = {
 def _make_app(db_path: Path):
     """Create a test client for the UI app with a temporary DB."""
     os.environ["FLAT_FINDER_UI_DB"] = str(db_path)
-    import importlib
-
-    import shared.config
-
     importlib.reload(shared.config)
-    import ui.main
-
     importlib.reload(ui.main)
     return TestClient(ui.main.app)
 

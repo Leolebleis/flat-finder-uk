@@ -9,6 +9,8 @@ from shapely.geometry import Point, shape
 
 log = logging.getLogger("flat-finder")
 
+HTTP_OK = 200
+
 
 def compute_zone_params(geometry: dict) -> dict:
     """Compute centroid and covering radius from a GeoJSON Geometry dict.
@@ -56,14 +58,14 @@ def resolve_postcode(lat: float, lng: float) -> str | None:
             params={"lon": lng, "lat": lat, "limit": 1},
             timeout=10,
         )
-        if resp.status_code != 200:
+        if resp.status_code != HTTP_OK:
             return None
         results = resp.json().get("result", [])
         if not results:
             return None
         return results[0].get("outcode")
-    except Exception as e:
-        log.warning(f"postcodes.io lookup failed: {e}")
+    except requests.RequestException as e:
+        log.warning("postcodes.io lookup failed: %s", e)
         return None
 
 
@@ -75,28 +77,13 @@ def resolve_rightmove_id(query: str) -> str | None:
             params={"query": query},
             timeout=10,
         )
-        if resp.status_code != 200:
+        if resp.status_code != HTTP_OK:
             return None
         matches = resp.json().get("matches", [])
         if not matches:
             return None
         m = matches[0]
         return f"{m['type']}^{m['id']}"
-    except Exception as e:
-        log.warning(f"Rightmove LOS lookup failed: {e}")
+    except requests.RequestException as e:
+        log.warning("Rightmove LOS lookup failed: %s", e)
         return None
-
-
-def generate_circle_polygon(lat: float, lng: float, radius_km: float, n_vertices: int = 32) -> dict:
-    """Generate a circular polygon as GeoJSON Geometry from center + radius.
-
-    Used for migrating legacy circular zones from zones.json.
-    """
-    coords = []
-    for i in range(n_vertices):
-        angle = 2 * math.pi * i / n_vertices
-        dlat = (radius_km / 111.32) * math.sin(angle)
-        dlng = (radius_km / (111.32 * math.cos(math.radians(lat)))) * math.cos(angle)
-        coords.append([lng + dlng, lat + dlat])
-    coords.append(coords[0])  # Close the ring
-    return {"type": "Polygon", "coordinates": [coords]}

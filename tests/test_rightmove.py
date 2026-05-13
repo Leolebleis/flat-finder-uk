@@ -1,3 +1,4 @@
+import pytest
 from scraper.rightmove import _check_description, _extract_next_data, build_search_url, parse_rightmove_response
 
 
@@ -130,14 +131,16 @@ def test_parse_rightmove_furnishing_from_description():
 
 
 def test_extract_next_data():
-    html = '<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"searchResults":{"resultCount":"5","properties":[]}}}}</script></html>'
+    html = (
+        '<html><script id="__NEXT_DATA__" type="application/json">'
+        '{"props":{"pageProps":{"searchResults":{"resultCount":"5","properties":[]}}}}'
+        "</script></html>"
+    )
     data = _extract_next_data(html)
     assert data["props"]["pageProps"]["searchResults"]["resultCount"] == "5"
 
 
 def test_extract_next_data_raises_on_missing():
-    import pytest
-
     with pytest.raises(ValueError, match="Could not find __NEXT_DATA__"):
         _extract_next_data("<html><body>No data here</body></html>")
 

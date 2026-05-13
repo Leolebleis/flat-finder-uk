@@ -28,7 +28,7 @@ FURNISH_PATTERNS = [
 ]
 
 
-def build_search_url(
+def build_search_url(  # noqa: PLR0913
     location_id: str, radius: float, min_beds: int, max_beds: int, max_price: int, index: int = 0
 ) -> str:
     params = {
@@ -76,7 +76,9 @@ def _parse_sqft(size_str: str | None) -> int | None:
 
 
 def _should_exclude(prop: dict) -> bool:
-    text = f"{prop.get('propertyTypeFullDescription', '')} {prop.get('summary', '')} {prop.get('displayAddress', '')}".lower()
+    text = (
+        f"{prop.get('propertyTypeFullDescription', '')} {prop.get('summary', '')} {prop.get('displayAddress', '')}"
+    ).lower()
     return any(term in text for term in EXCLUDE_TERMS)
 
 
@@ -149,7 +151,10 @@ def fetch_rightmove(location_id: str, radius: float, min_beds: int, max_beds: in
     all_listings = []
     index = 0
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     }
     while True:

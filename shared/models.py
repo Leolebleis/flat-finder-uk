@@ -1,8 +1,7 @@
 import sqlite3
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
-
-from shared.config import ZONES_FILE
 
 LISTINGS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
@@ -85,12 +84,9 @@ def init_db(db_path: Path) -> None:
     conn.execute(ZONES_SCHEMA)
     # Migrate existing databases: add new columns if missing
     for col, col_type in [("zone", "TEXT"), ("commute_mins", "INTEGER"), ("gym_commute_mins", "INTEGER")]:
-        try:
+        with suppress(sqlite3.OperationalError):
             conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {col_type}")
-        except sqlite3.OperationalError:
-            pass  # Column already exists
     _migrate_legacy_commutes(conn)
-    _migrate_legacy_zones(conn)
     conn.commit()
     conn.close()
 
@@ -118,10 +114,10 @@ def insert_listing(conn: sqlite3.Connection, listing: dict) -> bool:
                :zone, :commute_mins, :gym_commute_mins, :first_seen, :listing_date)""",
             listing,
         )
-        conn.commit()
-        return True
     except sqlite3.IntegrityError:
         return False
+    conn.commit()
+    return True
 
 
 def get_listings(conn: sqlite3.Connection, since: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:
@@ -190,41 +186,6 @@ def _migrate_legacy_commutes(conn: sqlite3.Connection) -> None:
     )
 
 
-def _migrate_legacy_zones(conn: sqlite3.Connection) -> None:
-    """Import zones from zones.json into DB if zones table is empty. Idempotent."""
-    count = conn.execute("SELECT COUNT(*) FROM zones").fetchone()[0]
-    if count > 0:
-        return
-    if not ZONES_FILE.exists():
-        return
-    import json as _json
-
-    from shared.zones import generate_circle_polygon
-
-    with open(ZONES_FILE) as f:
-        legacy_zones = _json.load(f)
-    now = datetime.now(UTC).isoformat()
-    for i, z in enumerate(legacy_zones):
-        radius_km = z["radius_miles"] * 1.60934
-        geom = generate_circle_polygon(z["lat"], z["lng"], radius_km)
-        conn.execute(
-            """INSERT INTO zones (name, geometry, centroid_lat, centroid_lng,
-               covering_radius_km, rightmove_id, openrent_term, color_index, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                z["name"],
-                _json.dumps(geom),
-                z["lat"],
-                z["lng"],
-                round(radius_km, 2),
-                z.get("rightmove_id"),
-                z.get("openrent_term"),
-                i % 8,
-                now,
-            ),
-        )
-
-
 def get_pois(conn: sqlite3.Connection) -> list[dict]:
     """Return all POIs ordered by id."""
     rows = conn.execute("SELECT * FROM pois ORDER BY id").fetchall()
@@ -255,7 +216,7 @@ def get_poi_commutes_for_listings(conn: sqlite3.Connection, listing_ids: list[st
         return {}
     placeholders = ",".join("?" for _ in listing_ids)
     rows = conn.execute(
-        f"SELECT listing_id, poi_id, commute_mins FROM poi_commutes WHERE listing_id IN ({placeholders})",
+        f"SELECT listing_id, poi_id, commute_mins FROM poi_commutes WHERE listing_id IN ({placeholders})",  # noqa: S608
         listing_ids,
     ).fetchall()
     result: dict[str, dict[int, int]] = {}
@@ -285,7 +246,7 @@ def get_zones(conn: sqlite3.Connection) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def insert_zone(
+def insert_zone(  # noqa: PLR0913
     conn: sqlite3.Connection,
     name: str,
     geometry: str,
@@ -318,7 +279,7 @@ def insert_zone(
     return cursor.lastrowid
 
 
-def update_zone(conn: sqlite3.Connection, zone_id: int, **kwargs) -> None:
+def update_zone(conn: sqlite3.Connection, zone_id: int, **kwargs: object) -> None:
     """Update zone fields. Pass only the fields to update."""
     allowed = {
         "name",
@@ -333,7 +294,7 @@ def update_zone(conn: sqlite3.Connection, zone_id: int, **kwargs) -> None:
     if not fields:
         return
     set_clause = ", ".join(f"{k} = ?" for k in fields)
-    conn.execute(f"UPDATE zones SET {set_clause} WHERE id = ?", [*fields.values(), zone_id])
+    conn.execute(f"UPDATE zones SET {set_clause} WHERE id = ?", [*fields.values(), zone_id])  # noqa: S608
     conn.commit()
 
 

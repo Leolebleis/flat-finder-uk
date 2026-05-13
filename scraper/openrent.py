@@ -4,6 +4,7 @@ from urllib.parse import quote_plus, urlencode
 
 import requests
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 
 from scraper.rightmove import _check_description
 
@@ -42,7 +43,7 @@ def _extract_coordinates(soup: BeautifulSoup) -> tuple[list[int], list[float], l
     return ids, lats, lngs
 
 
-def _extract_listing_id(card) -> str | None:
+def _extract_listing_id(card: Tag) -> str | None:
     """Get listing ID from the carousel's data-listing-id attribute, or from the href."""
     carousel = card.select_one("[data-listing-id]")
     if carousel:
@@ -52,7 +53,7 @@ def _extract_listing_id(card) -> str | None:
     return match.group(1) if match else None
 
 
-def _extract_price(card) -> int | None:
+def _extract_price(card: Tag) -> int | None:
     """Extract monthly price from the pim div."""
     pim = card.select_one(".pim .fs-4.fw-medium.text-primary")
     if not pim:
@@ -63,7 +64,7 @@ def _extract_price(card) -> int | None:
     return int(cleaned) if cleaned else None
 
 
-def _extract_title(card) -> str | None:
+def _extract_title(card: Tag) -> str | None:
     """Extract the title from the main heading div."""
     title_div = card.select_one(".fw-medium.text-primary.fs-3")
     return title_div.get_text(strip=True) if title_div else None
@@ -81,13 +82,13 @@ def _extract_address(title: str | None) -> str | None:
     return parts[1] if len(parts) > 1 else title
 
 
-def _extract_description(card) -> str:
+def _extract_description(card: Tag) -> str:
     """Extract the description snippet from the listing card."""
     desc_div = card.select_one(".line-clamp-2")
     return desc_div.get_text(strip=True) if desc_div else ""
 
 
-def _extract_image_url(card) -> str | None:
+def _extract_image_url(card: Tag) -> str | None:
     """Extract the first property image URL, handling lazy-loaded images."""
     img = card.select_one("img.propertyPic")
     if not img:
@@ -102,7 +103,7 @@ def _extract_image_url(card) -> str | None:
     return raw
 
 
-def _extract_bedrooms(card) -> int | None:
+def _extract_bedrooms(card: Tag) -> int | None:
     """Extract bedroom count from the features list."""
     items = card.select("ul.list-unstyled li")
     for li in items:
@@ -113,7 +114,7 @@ def _extract_bedrooms(card) -> int | None:
     return None
 
 
-def _extract_furnishing(card) -> str | None:
+def _extract_furnishing(card: Tag) -> str | None:
     """Extract furnishing info from the features list."""
     items = card.select("ul.list-unstyled li")
     for li in items:
@@ -127,7 +128,6 @@ def _extract_property_type(title: str | None) -> str | None:
     """Derive property type from the title prefix, e.g. '2 Bed Flat' -> 'Flat'."""
     if not title:
         return None
-    # Pattern: "<N> Bed <Type>," or "<Type>,"
     match = re.match(r"(?:\d+\s+Beds?\s+)?(.+?),", title)
     return match.group(1).strip() if match else None
 
@@ -205,8 +205,8 @@ def fetch_openrent(location: str, radius_km: int, min_beds: int, max_beds: int, 
     # OpenRent doesn't always enforce server-side filters after redirect,
     # so enforce price and bedroom limits client-side
     return [
-        l
-        for l in listings
-        if (l.get("price_pcm") is None or l["price_pcm"] <= max_price)
-        and (l.get("bedrooms") is None or min_beds <= l["bedrooms"] <= max_beds)
+        listing
+        for listing in listings
+        if (listing.get("price_pcm") is None or listing["price_pcm"] <= max_price)
+        and (listing.get("bedrooms") is None or min_beds <= listing["bedrooms"] <= max_beds)
     ]

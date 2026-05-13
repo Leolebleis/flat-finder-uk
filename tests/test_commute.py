@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import requests
 from scraper.commute import tfl_journey_mins
 
 
@@ -22,7 +23,7 @@ def test_tfl_journey_mins_returns_shortest():
 
 
 def test_tfl_journey_mins_returns_none_on_error():
-    with patch("scraper.commute.requests.get", side_effect=Exception("timeout")):
+    with patch("scraper.commute.requests.get", side_effect=requests.ConnectionError("timeout")):
         result = tfl_journey_mins(51.5472, -0.1803, 51.4869, -0.1832)
     assert result is None
 

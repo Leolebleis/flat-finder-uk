@@ -27,6 +27,6 @@ def tfl_journey_mins(
         if not journeys:
             return None
         return min(j["duration"] for j in journeys)
-    except Exception as e:
-        log.exception(f"TfL journey lookup failed: {e}")
+    except requests.RequestException:
+        log.exception("TfL journey lookup failed")
         return None

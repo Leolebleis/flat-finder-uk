@@ -29,7 +29,7 @@ def extract_coords_from_url(url: str) -> tuple[float, float] | None:
         try:
             resp = requests.head(url, allow_redirects=True, timeout=10)
             url = resp.url
-        except Exception as e:
-            log.exception(f"Failed to resolve short URL {url}: {e}")
+        except requests.RequestException:
+            log.exception("Failed to resolve short URL %s", url)
             return None
     return _extract_from_text(url)

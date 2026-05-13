@@ -223,26 +223,26 @@ def test_parse_openrent_html_extracts_listings():
 
 def test_parse_openrent_html_correct_ids():
     listings = parse_openrent_html(FIXTURE_HTML)
-    ids = [l["id"] for l in listings]
+    ids = [item["id"] for item in listings]
     assert "openrent_2746356" in ids
     assert "openrent_2801910" in ids
 
 
 def test_parse_openrent_html_excludes_shared():
     listings = parse_openrent_html(FIXTURE_HTML)
-    ids = [l["id"] for l in listings]
+    ids = [item["id"] for item in listings]
     assert "openrent_2754632" not in ids  # shared house
 
 
 def test_parse_openrent_html_excludes_studio():
     listings = parse_openrent_html(FIXTURE_HTML)
-    ids = [l["id"] for l in listings]
+    ids = [item["id"] for item in listings]
     assert "openrent_2773160" not in ids  # studio
 
 
 def test_parse_openrent_html_listing_fields():
     listings = parse_openrent_html(FIXTURE_HTML)
-    listing = next(l for l in listings if l["id"] == "openrent_2746356")
+    listing = next(item for item in listings if item["id"] == "openrent_2746356")
     assert listing["source"] == "openrent"
     assert (
         listing["url"] == "https://www.openrent.co.uk/property-to-rent/london/1-bed-flat-goldhurst-terrace-nw6/2746356"
@@ -258,7 +258,7 @@ def test_parse_openrent_html_listing_fields():
 
 def test_parse_openrent_html_second_listing_fields():
     listings = parse_openrent_html(FIXTURE_HTML)
-    listing = next(l for l in listings if l["id"] == "openrent_2801910")
+    listing = next(item for item in listings if item["id"] == "openrent_2801910")
     assert listing["price_pcm"] == 1800
     assert listing["bedrooms"] == 2
     assert listing["address"] == "Akenside Road, NW3"
@@ -267,7 +267,7 @@ def test_parse_openrent_html_second_listing_fields():
 
 def test_parse_openrent_html_coordinates():
     listings = parse_openrent_html(FIXTURE_HTML)
-    listing = next(l for l in listings if l["id"] == "openrent_2746356")
+    listing = next(item for item in listings if item["id"] == "openrent_2746356")
     assert listing["latitude"] == 51.544373
     assert listing["longitude"] == -0.1800825
 
@@ -275,14 +275,14 @@ def test_parse_openrent_html_coordinates():
 def test_parse_openrent_html_description_flags():
     listings = parse_openrent_html(FIXTURE_HTML)
     # First listing has "washing machine" and "balcony"
-    listing1 = next(l for l in listings if l["id"] == "openrent_2746356")
+    listing1 = next(item for item in listings if item["id"] == "openrent_2746356")
     assert listing1["has_washer"] == "yes"
     assert listing1["has_outdoor"] == "yes"
     assert "balcony" in listing1["outdoor_type"]
     assert listing1["has_dishwasher"] == "unknown"
 
     # Second listing has "dishwasher" and "garden"
-    listing2 = next(l for l in listings if l["id"] == "openrent_2801910")
+    listing2 = next(item for item in listings if item["id"] == "openrent_2801910")
     assert listing2["has_dishwasher"] == "yes"
     assert listing2["has_outdoor"] == "yes"
     assert "garden" in listing2["outdoor_type"]
@@ -291,7 +291,7 @@ def test_parse_openrent_html_description_flags():
 def test_parse_openrent_html_lazy_image():
     """When first img uses placeholder src and real URL is in data-src."""
     listings = parse_openrent_html(FIXTURE_HTML)
-    listing = next(l for l in listings if l["id"] == "openrent_2801910")
+    listing = next(item for item in listings if item["id"] == "openrent_2801910")
     assert listing["image_url"] == "https://imagescdn.openrent.co.uk/listings/2801910/photo2.JPG"
 
 

@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from shared.zones import (
     compute_zone_params,
-    generate_circle_polygon,
     point_in_zone,
     resolve_postcode,
     resolve_rightmove_id,
@@ -29,7 +28,7 @@ def test_compute_zone_params_covering_radius():
 
 
 def test_compute_zone_params_validates_polygon():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Expected Polygon"):
         compute_zone_params({"type": "Point", "coordinates": [0, 0]})
 
 
@@ -41,12 +40,6 @@ def test_point_in_polygon_inside():
 def test_point_in_polygon_outside():
     geom_str = json.dumps(SQUARE_POLYGON)
     assert point_in_zone(52.0, -0.18, geom_str) is False
-
-
-def test_generate_circle_polygon():
-    geom = generate_circle_polygon(51.5, -0.18, 1.0)
-    assert geom["type"] == "Polygon"
-    assert len(geom["coordinates"][0]) == 33  # 32 + closing
 
 
 @patch("shared.zones.requests.get")

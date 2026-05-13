@@ -1,15 +1,22 @@
-# tests/test_scraper.py
+import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from scraper.scraper import _listing_fingerprint, _normalize_address, is_first_run, process_new_listings
-from shared.models import get_connection, init_db, insert_listing, set_state
+from scraper.scraper import (
+    _filter_listings_by_zone,
+    _listing_fingerprint,
+    _normalize_address,
+    is_first_run,
+    process_new_listings,
+    run,
+)
+from shared.models import get_connection, init_db, insert_listing, insert_poi, insert_zone, set_state
 
 
-def _make_listing(id="rightmove_1", price=1800):
+def _make_listing(listing_id: str = "rightmove_1", price: int = 1800) -> dict:
     return {
-        "id": id,
+        "id": listing_id,
         "source": "rightmove",
         "url": "https://example.com",
         "title": "1 bed flat",
@@ -116,24 +123,21 @@ def test_listing_fingerprint_differs_on_price():
 
 
 def test_listing_fingerprint_none_when_missing_fields():
-    l = _make_listing("rm_1")
-    l["address"] = None
-    assert _listing_fingerprint(l) is None
+    listing = _make_listing("rm_1")
+    listing["address"] = None
+    assert _listing_fingerprint(listing) is None
 
 
 def test_scraper_fetches_commutes_for_all_pois():
     """run() should fetch commute times for each POI in the DB."""
-    import json as _json
-
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
         init_db(db_path)
         conn = get_connection(db_path)
-        from shared.models import insert_poi, insert_zone
 
         poi_id = insert_poi(conn, "Test Place", 51.50, -0.12, 0)
         # Insert a zone that covers the listing location
-        zone_geom = _json.dumps(
+        zone_geom = json.dumps(
             {
                 "type": "Polygon",
                 "coordinates": [[[-0.20, 51.50], [-0.10, 51.50], [-0.10, 51.60], [-0.20, 51.60], [-0.20, 51.50]]],
@@ -163,8 +167,6 @@ def test_scraper_fetches_commutes_for_all_pois():
             patch("scraper.scraper.GMAIL_ADDRESS", ""),
             patch("scraper.scraper.GMAIL_APP_PASSWORD", ""),
         ):
-            from scraper.scraper import run
-
             run()
         conn = get_connection(db_path)
         commutes = conn.execute("SELECT * FROM poi_commutes WHERE listing_id = 'rm_new'").fetchall()
@@ -173,10 +175,6 @@ def test_scraper_fetches_commutes_for_all_pois():
         assert commutes[0]["poi_id"] == poi_id
         assert commutes[0]["commute_mins"] == 25
 
-
-import json
-
-from scraper.scraper import _filter_listings_by_zone
 
 ZONE_GEOM = json.dumps(
     {

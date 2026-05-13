@@ -1,6 +1,12 @@
 from unittest.mock import MagicMock, patch
 
-from scraper.notifier import format_email_html, format_ntfy_message, send_ntfy
+from scraper.notifier import (
+    format_email_html,
+    format_failure_message,
+    format_ntfy_message,
+    format_recovery_message,
+    send_ntfy,
+)
 
 
 def test_format_ntfy_single_listing():
@@ -51,15 +57,11 @@ def test_send_ntfy_posts_to_correct_url(mock_post):
 
 
 def test_format_ntfy_failure_message():
-    from scraper.notifier import format_failure_message
-
     title, body = format_failure_message("rightmove", "Connection timeout")
     assert "rightmove" in title.lower() or "rightmove" in body.lower()
     assert "timeout" in body.lower() or "Connection timeout" in body
 
 
 def test_format_ntfy_recovery_message():
-    from scraper.notifier import format_recovery_message
-
     title, body = format_recovery_message("rightmove")
     assert "recover" in title.lower() or "recover" in body.lower()
