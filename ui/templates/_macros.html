@@ -1,0 +1,30 @@
+{# Reusable Jinja macros. Imported via {% from "_macros.html" import ... %} #}
+
+{% macro feature_pill(value, yes_label, no_label, unknown_label) %}
+{% if value == 'yes' %}
+<span class="pill pill--yes">{{ yes_label }}</span>
+{% elif value == 'no' %}
+<span class="pill pill--no">{{ no_label }}</span>
+{% else %}
+<span class="pill pill--unknown">{{ unknown_label }}</span>
+{% endif %}
+{% endmacro %}
+
+{% macro feature_pill_editable(listing_id, field, value, override_value, original_value, yes_label, no_label, unknown_label) %}
+<span class="pill pill--{{ 'yes' if value == 'yes' else ('no' if value == 'no' else 'unknown') }}{% if override_value %} pill--overridden{% endif %}"
+      data-action="cycle-pill"
+      data-id="{{ listing_id }}"
+      data-field="{{ field }}"
+      data-value="{{ value }}"
+      data-original="{{ original_value }}"
+      title="Click to change">
+    {{ yes_label if value == 'yes' else (no_label if value == 'no' else unknown_label) }}
+</span>
+{% endmacro %}
+
+{% macro poi_metric(commute_mins, poi) %}
+<div class="metric-stacked">
+    <span class="metric-stacked__value" style="color: var(--poi-color-{{ poi.color_index % 8 }});">{{ commute_mins }} min</span>
+    <span class="metric-stacked__label">{{ poi.name }}</span>
+</div>
+{% endmacro %}

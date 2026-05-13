@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% from "_macros.html" import feature_pill_editable, poi_metric %}
+{% block title %}{{ listing.title or "Listing" }} - Flat Finder{% endblock %}
+
+{% block head %}
+{% if listing.latitude and listing.longitude %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="detail" data-listing-id="{{ listing.id }}"
+     data-seen="{{ 'true' if listing.seen else 'false' }}"
+     data-favourite="{{ 'true' if listing.favourite else 'false' }}">
+
+    <a class="detail__back" href="{{ request.url_for('feed_page') }}">&larr; Back to feed</a>
+
+    <div class="detail__hero">
+        {% if listing.image_url %}
+        <img class="detail__img" src="{{ listing.image_url }}" alt="{{ listing.address or 'Listing photo' }}">
+        {% else %}
+        <div class="detail__no-img">No image available</div>
+        {% endif %}
+    </div>
+
+    <div class="detail__content">
+        <div class="detail__top">
+            <div>
+                <span class="detail__price">
+                    {% if listing.price_pcm %}&pound;{{ "{:,}".format(listing.price_pcm) }}<small>/mo</small>{% else %}Price TBC{% endif %}
+                </span>
+                {% if listing.title %}
+                <h1 class="detail__title">{{ listing.title }}</h1>
+                {% endif %}
+                <p class="detail__address">{{ listing.address or "Address not available" }}</p>
+            </div>
+
+            <div class="detail__quick-actions">
+                <button class="btn-action {% if listing.seen %}btn-action--active{% endif %}"
+                        data-action="toggle-seen"
+                        data-id="{{ listing.id }}"
+                        data-seen="{{ 'true' if listing.seen else 'false' }}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    {{ "Seen" if listing.seen else "Mark seen" }}
+                </button>
+
+                <button class="btn-action btn-action--fav {% if listing.favourite %}btn-action--fav-active{% endif %}"
+                        data-action="toggle-fav"
+                        data-id="{{ listing.id }}"
+                        data-favourite="{{ 'true' if listing.favourite else 'false' }}">
+                    &#9733; {{ "Saved" if listing.favourite else "Save" }}
+                </button>
+
+                <a class="btn-action btn-action--primary" href="{{ listing.url }}" target="_blank" rel="noopener">
+                    View on {{ listing.source | capitalize }} &nearr;
+                </a>
+            </div>
+        </div>
+
+        <div class="detail__badges">
+            {% if listing.bedrooms is not none %}
+            <span class="metric">{{ listing.bedrooms }} bed</span>
+            {% endif %}
+            {% if listing.sqft %}
+            <span class="metric">{{ (listing.sqft * 0.0929) | round | int }} m&sup2;</span>
+            {% endif %}
+            {% if listing.property_type %}
+            <span class="metric">{{ listing.property_type }}</span>
+            {% endif %}
+            {% if listing.furnishing %}
+            <span class="metric">{{ listing.furnishing }}</span>
+            {% endif %}
+            {% if listing.source %}
+            <span class="metric">{{ listing.source | capitalize }}</span>
+            {% endif %}
+            {% if listing.listing_date %}
+            <span class="metric">Listed {{ listing.listing_date }}</span>
+            {% endif %}
+            {% for poi in pois %}
+            {% if poi.id in listing.poi_commutes %}{{ poi_metric(listing.poi_commutes[poi.id], poi) }}{% endif %}
+            {% endfor %}
+            {% if listing.zone %}
+            <span class="metric">{{ listing.zone }}</span>
+            {% endif %}
+        </div>
+
+        <div class="detail__features">
+            <h3 class="detail__label">Features <span class="detail__label-hint">(click to edit)</span></h3>
+            <div class="detail__pills">
+                {{ feature_pill_editable(listing.id, "override_dishwasher", listing.has_dishwasher, listing.override_dishwasher, listing.original_dishwasher, "Dishwasher", "No dishwasher", "Dishwasher?") }}
+                {{ feature_pill_editable(listing.id, "override_washer", listing.has_washer, listing.override_washer, listing.original_washer, "Washer", "No washer", "Washer?") }}
+                {{ feature_pill_editable(listing.id, "override_outdoor", listing.has_outdoor, listing.override_outdoor, listing.original_outdoor, listing.outdoor_type or "Outdoor", "No outdoor", "Outdoor?") }}
+            </div>
+        </div>
+
+        <div class="detail__notes">
+            <h3 class="detail__label">Notes</h3>
+            <textarea class="notes-input"
+                      data-action="save-notes"
+                      data-id="{{ listing.id }}"
+                      placeholder="Add notes about this listing..."
+                      rows="3">{{ listing.notes or "" }}</textarea>
+        </div>
+
+        {% if listing.description %}
+        <div class="detail__description-section">
+            <h3 class="detail__label">Description</h3>
+            <div class="detail__description">{{ listing.description }}</div>
+        </div>
+        {% endif %}
+
+        {% if listing.latitude and listing.longitude %}
+        <div class="detail__map-section">
+            <h3 class="detail__label">Location</h3>
+            <div id="detail-map" class="detail__map"></div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if listing.latitude and listing.longitude %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+    var lat = {{ listing.latitude }};
+    var lng = {{ listing.longitude }};
+    var map = L.map("detail-map").setView([lat, lng], 15);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 19
+    }).addTo(map);
+    L.marker([lat, lng]).addTo(map);
+})();
+</script>
+{% endif %}
+{% endblock %}

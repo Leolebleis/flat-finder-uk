@@ -1,0 +1,35 @@
+services:
+  flat-finder:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    container_name: flat-finder
+    restart: unless-stopped
+    volumes:
+      - flat-finder-data:/app/data
+    environment:
+      - FLAT_FINDER_UI_DB=/app/data/flat_finder.db
+    networks:
+      - default
+      - pi-net
+
+  flat-finder-scraper:
+    build:
+      context: .
+      dockerfile: scraper/Dockerfile
+    container_name: flat-finder-scraper
+    restart: unless-stopped
+    volumes:
+      - flat-finder-data:/app/data
+    environment:
+      - FLAT_FINDER_DB=/app/data/flat_finder.db
+      - NTFY_TOPIC=${NTFY_TOPIC:-}
+      - GMAIL_ADDRESS=${GMAIL_ADDRESS:-}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD:-}
+
+volumes:
+  flat-finder-data:
+
+networks:
+  pi-net:
+    external: true
