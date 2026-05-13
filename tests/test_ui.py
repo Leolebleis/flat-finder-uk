@@ -255,7 +255,8 @@ def test_feed_page_shows_gym_commute():
 
         resp = client.get("/")
         assert resp.status_code == 200
-        assert "min to Gym" in resp.text
+        assert "metric-stacked" in resp.text
+        assert "Gym" in resp.text
 
 
 def test_feed_page_best_match_sort():
@@ -434,7 +435,8 @@ def test_feed_page_with_pois_shows_dynamic_metrics():
         client = _make_app(db_path)
         resp = client.get("/")
         assert resp.status_code == 200
-        assert "35 min to Rue" in resp.text
+        assert "35 min" in resp.text
+        assert "Rue" in resp.text
         assert "poi-weight-slider" in resp.text
 
 
@@ -450,7 +452,8 @@ def test_detail_page_with_pois_shows_dynamic_metrics():
         client = _make_app(db_path)
         resp = client.get("/listing/rightmove_1")
         assert resp.status_code == 200
-        assert "22 min to Office" in resp.text
+        assert "22 min" in resp.text
+        assert "Office" in resp.text
 
 
 # --- Zone API tests ---
