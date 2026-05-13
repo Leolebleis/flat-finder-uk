@@ -2,13 +2,13 @@
 
 Property alert system. Scrapes Rightmove + OpenRent, displays listings in a local web UI.
 
-Design docs: `../../docs/plans/2026-02-26-flat-finder-design.md`, `../../docs/plans/2026-02-26-flat-finder-scoring-design.md`, `docs/2026-03-07-flat-finder-poi-design.md`
+Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawable-zones-design.md`, `docs/2026-02-26-flat-finder-multi-zone-plan.md`, `docs/flat-finder-deployment.md`
 
 ## Structure
 - Everything runs on Pi as Docker containers via its own `docker-compose.yml` (separate from mediastack)
 - `scraper/` and `ui/` share the same SQLite DB via `flat-finder-data` volume (WAL mode)
 - `shared/` (models, config, geo) used by both components
-- External `flat-finder-net` Docker network bridges nginx (mediastack) to the flat-finder UI
+- Attached to the external `pi-net` Docker network (defined by the raspberrypi meta-repo's compose) so nginx can reach the UI container
 - Zones live in the `zones` table (drawable via Settings page); `zones.json` no longer mounted
 
 ## Components
@@ -17,6 +17,8 @@ Design docs: `../../docs/plans/2026-02-26-flat-finder-design.md`, `../../docs/pl
 - **shared/models.py** -- SQLite schema (listings, pois, poi_commutes), migrations, insert/query helpers
 - **shared/config.py** -- env var config (DB_PATH, NTFY_TOPIC, rent/bedroom bounds)
 - **shared/geo.py** -- Google Maps URL parser (extracts lat/lng from full URLs and short links)
+- **shared/zones.py** -- Polygon utilities (centroid, point-in-zone) + external lookups (postcodes.io, Rightmove LOS typeahead)
+- **shared/scraping.py** -- Shared scraper helpers: EXCLUDE_TERMS, should_exclude_text, check_description, HTTP_HEADERS (pre-compiled appliance/outdoor regexes)
 
 ## Tooling
 - Dep manager: `uv` (single `pyproject.toml` + `uv.lock` at repo root)
@@ -64,7 +66,7 @@ Design docs: `../../docs/plans/2026-02-26-flat-finder-design.md`, `../../docs/pl
 - **bs4 attribute access**: `tag["attr"]` / `tag.get("attr")` returns `str | AttributeValueList | None`. Guard with `isinstance(value, str)` before string ops or ty fails.
 - **Hatch wheel inclusion**: `packages = ["ui"]` already includes non-Python files (templates/, static/, binaries) under that dir. Don't add `force-include` -- it duplicates entries and warns at build time.
 - **Outdoor detection**: Uses regex word boundaries + exclusion patterns. "communal garden", "shared garden", street names like "Gardens", and substrings ("occupation" matching "patio") are excluded.
-- **Docker build context**: docker-compose.yml is in this repo. Changes must be on master branch for rebuild to pick them up.
+- **Docker build context**: docker-compose.yml is in this repo. Changes must be on `main` for the Pi-side rebuild to pick them up.
 - **DB schema ownership**: All schemas live in `shared/models.py::init_db` (listings, scraper_state, pois, poi_commutes, zones, user_state). Both scraper + UI containers call `init_db` on startup -- safe with WAL. Do NOT declare schemas in `ui/` or `scraper/`; the scraper writes to UI-owned tables (e.g. prune-orphan cleanup) and that only works because `init_db` is shared.
 - **Column migrations**: Use `_ensure_columns(conn, table, [(col, type)])` (PRAGMA table_info guard). Avoid `try/except sqlite3.OperationalError: pass` — it runs the ALTER on every startup.
 - **TfL rate limiting**: Backfill loops need `time.sleep(0.5)` between API calls. Without throttling, TfL returns 429 after ~50 requests.
