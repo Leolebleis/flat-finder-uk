@@ -13,29 +13,37 @@
         right: 10px;
         z-index: 1000;
         display: flex;
-        gap: 4px;
+        gap: 6px;
     }
     .map-filters button {
-        padding: 6px 12px;
-        border: 1px solid #999;
-        border-radius: 4px;
-        background: #fff;
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+        color: var(--text-muted);
         cursor: pointer;
-        font-size: 13px;
+        font-family: var(--font-body);
+        font-size: 0.82rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    .map-filters button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
     }
     .map-filters button.active {
-        background: #333;
+        background: var(--accent);
         color: #fff;
-        border-color: #333;
+        border-color: var(--accent);
     }
     .zone-label {
         background: transparent;
         border: none;
         box-shadow: none;
-        font-family: 'DM Sans', sans-serif;
+        font-family: var(--font-body);
         font-size: 12px;
         font-weight: 600;
-        color: #666;
+        color: var(--text-faint);
     }
 </style>
 {% endblock %}
