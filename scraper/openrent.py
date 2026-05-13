@@ -5,11 +5,9 @@ from urllib.parse import quote_plus, urlencode
 import requests
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-
-from scraper.rightmove import _check_description
+from shared.scraping import HTTP_HEADERS, check_description, should_exclude_text
 
 BASE_URL = "https://www.openrent.co.uk/properties-to-rent"
-EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
 
 
 def build_search_url(location: str, radius_km: int, min_beds: int, max_beds: int, max_price: int) -> str:
@@ -135,12 +133,6 @@ def _extract_property_type(title: str | None) -> str | None:
     return match.group(1).strip() if match else None
 
 
-def _should_exclude(title: str, description: str) -> bool:
-    """Check if listing should be excluded based on title/description."""
-    text = f"{title} {description}".lower()
-    return any(term in text for term in EXCLUDE_TERMS)
-
-
 def parse_openrent_html(html: str) -> list[dict]:
     """Parse OpenRent search results HTML into listing dicts."""
     soup = BeautifulSoup(html, "html.parser")
@@ -163,11 +155,11 @@ def parse_openrent_html(html: str) -> list[dict]:
         title = _extract_title(card)
         description = _extract_description(card)
 
-        if _should_exclude(title or "", description):
+        if should_exclude_text(f"{title or ''} {description}"):
             continue
 
         href = card.get("href", "")
-        desc_flags = _check_description(description)
+        desc_flags = check_description(description)
         lat, lng = coord_map.get(listing_id, (None, None))
 
         listing = {
@@ -197,12 +189,7 @@ def parse_openrent_html(html: str) -> list[dict]:
 def fetch_openrent(location: str, radius_km: int, min_beds: int, max_beds: int, max_price: int) -> list[dict]:
     """Fetch and parse OpenRent search results."""
     url = build_search_url(location, radius_km, min_beds, max_beds, max_price)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    }
-    resp = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
+    resp = requests.get(url, headers=HTTP_HEADERS, timeout=30, allow_redirects=True)
     resp.raise_for_status()
     listings = parse_openrent_html(resp.text)
     # OpenRent doesn't always enforce server-side filters after redirect,

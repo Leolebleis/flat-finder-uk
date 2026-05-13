@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import sqlite3
@@ -5,6 +6,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from shapely.geometry import Point, shape
+from shapely.prepared import prep
 from shared.config import (
     DB_PATH,
     GMAIL_ADDRESS,
@@ -16,15 +19,18 @@ from shared.config import (
 )
 from shared.models import (
     get_connection,
+    get_poi_commutes_for_listings,
     get_pois,
     get_state,
     get_zones,
     init_db,
     insert_listing,
+    listings_missing_poi_commute,
+    prune_orphan_poi_commutes,
+    prune_orphan_user_state,
     set_state,
     upsert_poi_commute,
 )
-from shared.zones import point_in_zone
 
 from scraper.commute import tfl_journey_mins
 from scraper.notifier import (
@@ -111,16 +117,36 @@ def _handle_failure_state(conn: sqlite3.Connection, source: str, error: str | No
 
 
 def _filter_listings_by_zone(listings: list[dict[str, Any]], zone: dict[str, Any]) -> list[dict[str, Any]]:
-    """Keep only listings inside the zone polygon. Keep those without coords."""
+    """Keep only listings inside the zone polygon. Keep those without coords.
+
+    Pre-parses and prepares the polygon once so the per-listing contains() is fast
+    (shapely's prepared geometry is much cheaper for many point-in-polygon tests).
+    """
     geom_str = zone.get("geometry")
     if not geom_str:
         return listings
+    prepared = prep(shape(json.loads(geom_str)))
     return [
         listing
         for listing in listings
         if not (listing.get("latitude") and listing.get("longitude"))
-        or point_in_zone(listing["latitude"], listing["longitude"], geom_str)
+        or prepared.contains(Point(listing["longitude"], listing["latitude"]))
     ]
+
+
+def _fetch_commute_for_listings(
+    conn: sqlite3.Connection,
+    poi: dict[str, Any],
+    rows: list[Any],
+) -> None:
+    """Fetch TfL commutes for the given listings and upsert results. Throttled."""
+    for row in rows:
+        mins = tfl_journey_mins(row["latitude"], row["longitude"], poi["lat"], poi["lng"])
+        if mins is None:
+            # TfL failure — no commute fetched, skip the rate-limit sleep
+            continue
+        upsert_poi_commute(conn, row["id"], poi["id"], mins)
+        time.sleep(TFL_RATE_LIMIT_SLEEP_S)
 
 
 def run() -> None:  # noqa: C901, PLR0912, PLR0915
@@ -175,52 +201,38 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
     new_listings = process_new_listings(conn, all_listings)
     pois = get_pois(conn)
 
-    # Fetch commute times for new listings
-    for listing in new_listings:
-        if listing.get("latitude") and listing.get("longitude"):
-            for poi in pois:
-                mins = tfl_journey_mins(listing["latitude"], listing["longitude"], poi["lat"], poi["lng"])
-                if mins is not None:
-                    upsert_poi_commute(conn, listing["id"], poi["id"], mins)
-                time.sleep(TFL_RATE_LIMIT_SLEEP_S)
-
-    # Backfill: listings missing commute data for any POI
-    if pois:
+    # Fetch commute times for new listings (per POI)
+    if new_listings and pois:
+        rows = [
+            {"id": listing["id"], "latitude": listing["latitude"], "longitude": listing["longitude"]}
+            for listing in new_listings
+            if listing.get("latitude") and listing.get("longitude")
+        ]
         for poi in pois:
-            missing = conn.execute(
-                """SELECT l.id, l.latitude, l.longitude FROM listings l
-                   WHERE l.latitude IS NOT NULL AND l.longitude IS NOT NULL
-                   AND NOT EXISTS (
-                       SELECT 1 FROM poi_commutes pc
-                       WHERE pc.listing_id = l.id AND pc.poi_id = ?
-                   )""",
-                (poi["id"],),
-            ).fetchall()
-            if missing:
-                log.info("Backfilling '%s' commute for %d listings", poi["name"], len(missing))
-                for row in missing:
-                    mins = tfl_journey_mins(row["latitude"], row["longitude"], poi["lat"], poi["lng"])
-                    if mins is not None:
-                        upsert_poi_commute(conn, row["id"], poi["id"], mins)
-                    time.sleep(TFL_RATE_LIMIT_SLEEP_S)
+            _fetch_commute_for_listings(conn, poi, rows)
 
-    # Attach poi_commutes to new listings for notification
-    for listing in new_listings:
-        commute_rows = conn.execute(
-            "SELECT poi_id, commute_mins FROM poi_commutes WHERE listing_id = ?",
-            (listing["id"],),
-        ).fetchall()
-        listing["poi_commutes"] = {row["poi_id"]: row["commute_mins"] for row in commute_rows}
+    # Backfill: any listings still missing commute data for any POI
+    for poi in pois:
+        missing = listings_missing_poi_commute(conn, poi["id"])
+        if missing:
+            log.info("Backfilling '%s' commute for %d listings", poi["name"], len(missing))
+            _fetch_commute_for_listings(conn, poi, missing)
 
-    # Prune listings older than 2 weeks
+    # Attach poi_commutes to new listings for notification (one batched query)
+    if new_listings:
+        commutes = get_poi_commutes_for_listings(conn, [listing["id"] for listing in new_listings])
+        for listing in new_listings:
+            listing["poi_commutes"] = commutes.get(listing["id"], {})
+
+    # Prune listings older than the retention window
     pruned = conn.execute(
         f"DELETE FROM listings WHERE first_seen < datetime('now', '-{PRUNE_AFTER_DAYS} days')"  # noqa: S608
     ).rowcount
     if pruned:
-        conn.execute("DELETE FROM user_state WHERE listing_id NOT IN (SELECT id FROM listings)")
-        conn.execute("DELETE FROM poi_commutes WHERE listing_id NOT IN (SELECT id FROM listings)")
+        prune_orphan_user_state(conn)
+        prune_orphan_poi_commutes(conn)
         conn.commit()
-        log.info("Pruned %d listings older than 2 weeks", pruned)
+        log.info("Pruned %d listings older than %d days", pruned, PRUNE_AFTER_DAYS)
 
     if first_run:
         set_state(conn, "initialised", "true")

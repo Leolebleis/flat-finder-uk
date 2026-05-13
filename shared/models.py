@@ -2,6 +2,7 @@ import sqlite3
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 LISTINGS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
@@ -24,8 +25,6 @@ CREATE TABLE IF NOT EXISTS listings (
     has_outdoor     TEXT DEFAULT 'unknown',
     outdoor_type    TEXT,
     zone            TEXT,
-    commute_mins    INTEGER,
-    gym_commute_mins INTEGER,
     first_seen      DATETIME NOT NULL,
     listing_date    TEXT
 );
@@ -73,6 +72,36 @@ CREATE TABLE IF NOT EXISTS zones (
 );
 """
 
+USER_STATE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS user_state (
+    listing_id          TEXT PRIMARY KEY,
+    seen                BOOLEAN DEFAULT 0,
+    favourite           BOOLEAN DEFAULT 0,
+    notes               TEXT,
+    override_dishwasher TEXT,
+    override_washer     TEXT,
+    override_outdoor    TEXT,
+    updated_at          DATETIME
+);
+"""
+
+# Columns added to user_state after the table existed. Idempotent thanks to
+# the table_info check; older DBs missing these columns will get them added,
+# fresh DBs are no-ops.
+_USER_STATE_LATE_COLUMNS = [
+    ("override_dishwasher", "TEXT"),
+    ("override_washer", "TEXT"),
+    ("override_outdoor", "TEXT"),
+]
+
+
+def _ensure_columns(conn: sqlite3.Connection, table: str, columns: list[tuple[str, str]]) -> None:
+    """Idempotent ADD COLUMN guarded by PRAGMA table_info."""
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    for col, col_type in columns:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+
 
 def init_db(db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
@@ -82,11 +111,11 @@ def init_db(db_path: Path) -> None:
     conn.execute(POIS_SCHEMA)
     conn.execute(POI_COMMUTES_SCHEMA)
     conn.execute(ZONES_SCHEMA)
-    # Migrate existing databases: add new columns if missing
-    for col, col_type in [("zone", "TEXT"), ("commute_mins", "INTEGER"), ("gym_commute_mins", "INTEGER")]:
-        with suppress(sqlite3.OperationalError):
-            conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {col_type}")
-    _migrate_legacy_commutes(conn)
+    conn.execute(USER_STATE_SCHEMA)
+    # Older listings DBs may carry the deprecated commute_mins/gym_commute_mins
+    # columns. New columns to ensure: zone (which post-dates the first release).
+    _ensure_columns(conn, "listings", [("zone", "TEXT")])
+    _ensure_columns(conn, "user_state", _USER_STATE_LATE_COLUMNS)
     conn.commit()
     conn.close()
 
@@ -94,24 +123,25 @@ def init_db(db_path: Path) -> None:
 def get_connection(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    # Two writers (scraper + UI) share this DB in WAL mode; busy_timeout
+    # lets SQLite spin internally on lock contention rather than raise.
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
 def insert_listing(conn: sqlite3.Connection, listing: dict) -> bool:
     """Insert a listing. Returns True if new, False if already existed."""
     listing.setdefault("zone", None)
-    listing.setdefault("commute_mins", None)
-    listing.setdefault("gym_commute_mins", None)
     try:
         conn.execute(
             """INSERT INTO listings (id, source, url, title, price_pcm, bedrooms,
                address, latitude, longitude, description, image_url, property_type,
                furnishing, sqft, has_dishwasher, has_washer, has_outdoor, outdoor_type,
-               zone, commute_mins, gym_commute_mins, first_seen, listing_date)
+               zone, first_seen, listing_date)
                VALUES (:id, :source, :url, :title, :price_pcm, :bedrooms,
                :address, :latitude, :longitude, :description, :image_url, :property_type,
                :furnishing, :sqft, :has_dishwasher, :has_washer, :has_outdoor, :outdoor_type,
-               :zone, :commute_mins, :gym_commute_mins, :first_seen, :listing_date)""",
+               :zone, :first_seen, :listing_date)""",
             listing,
         )
     except sqlite3.IntegrityError:
@@ -145,45 +175,17 @@ def set_state(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.commit()
 
 
+def prune_orphan_user_state(conn: sqlite3.Connection) -> None:
+    """Remove user_state rows whose listing no longer exists."""
+    conn.execute("DELETE FROM user_state WHERE listing_id NOT IN (SELECT id FROM listings)")
+
+
+def prune_orphan_poi_commutes(conn: sqlite3.Connection) -> None:
+    """Remove poi_commutes rows whose listing no longer exists."""
+    conn.execute("DELETE FROM poi_commutes WHERE listing_id NOT IN (SELECT id FROM listings)")
+
+
 # --- POI helpers ---
-
-
-def _migrate_legacy_commutes(conn: sqlite3.Connection) -> None:
-    """Seed Work and Gym POIs from legacy commute columns. Idempotent."""
-    count = conn.execute("SELECT COUNT(*) FROM pois").fetchone()[0]
-    if count > 0:
-        return  # Already migrated
-
-    has_legacy = conn.execute(
-        "SELECT COUNT(*) FROM listings WHERE commute_mins IS NOT NULL OR gym_commute_mins IS NOT NULL"
-    ).fetchone()[0]
-    if has_legacy == 0:
-        return  # No legacy data to migrate
-
-    now = datetime.now(UTC).isoformat()
-    conn.execute(
-        "INSERT INTO pois (name, lat, lng, color_index, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("Work", 51.4869, -0.1832, 0, now),
-    )
-    work_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-    conn.execute(
-        "INSERT INTO pois (name, lat, lng, color_index, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("Gym", 51.5445, -0.1762, 1, now),
-    )
-    gym_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-
-    # Copy legacy commute_mins -> poi_commutes for Work
-    conn.execute(
-        "INSERT INTO poi_commutes (listing_id, poi_id, commute_mins) "
-        "SELECT id, ?, commute_mins FROM listings WHERE commute_mins IS NOT NULL",
-        (work_id,),
-    )
-    # Copy legacy gym_commute_mins -> poi_commutes for Gym
-    conn.execute(
-        "INSERT INTO poi_commutes (listing_id, poi_id, commute_mins) "
-        "SELECT id, ?, gym_commute_mins FROM listings WHERE gym_commute_mins IS NOT NULL",
-        (gym_id,),
-    )
 
 
 def get_pois(conn: sqlite3.Connection) -> list[dict]:
@@ -224,10 +226,7 @@ def get_poi_commutes_for_listings(conn: sqlite3.Connection, listing_ids: list[st
     ).fetchall()
     result: dict[str, dict[int, int]] = {}
     for row in rows:
-        lid = row["listing_id"] if isinstance(row, sqlite3.Row) else row[0]
-        pid = row["poi_id"] if isinstance(row, sqlite3.Row) else row[1]
-        mins = row["commute_mins"] if isinstance(row, sqlite3.Row) else row[2]
-        result.setdefault(lid, {})[pid] = mins
+        result.setdefault(row["listing_id"], {})[row["poi_id"]] = row["commute_mins"]
     return result
 
 
@@ -238,6 +237,53 @@ def upsert_poi_commute(conn: sqlite3.Connection, listing_id: str, poi_id: int, c
         (listing_id, poi_id, commute_mins),
     )
     conn.commit()
+
+
+def listings_missing_poi_commute(
+    conn: sqlite3.Connection,
+    poi_id: int,
+) -> list[sqlite3.Row]:
+    """Return listings with coords that lack a poi_commute row for this POI."""
+    return conn.execute(
+        """SELECT l.id, l.latitude, l.longitude FROM listings l
+           WHERE l.latitude IS NOT NULL AND l.longitude IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM poi_commutes pc
+               WHERE pc.listing_id = l.id AND pc.poi_id = ?
+           )""",
+        (poi_id,),
+    ).fetchall()
+
+
+# --- User state helpers ---
+
+
+_USER_STATE_FIELDS = ("seen", "favourite", "notes", "override_dishwasher", "override_washer", "override_outdoor")
+
+
+def upsert_user_state(conn: sqlite3.Connection, listing_id: str, updates: dict[str, Any]) -> dict[str, Any]:
+    """Upsert user_state for a listing, applying only keys present in `updates`.
+
+    Returns the resulting row as a dict. Uses ON CONFLICT so values not in
+    `updates` keep their previous value (no read-modify-write race).
+    """
+    fields = {k: updates[k] for k in _USER_STATE_FIELDS if k in updates}
+    fields["updated_at"] = datetime.now(UTC).isoformat()
+    cols = ["listing_id", *fields]
+    placeholders = ",".join("?" for _ in cols)
+    # COALESCE excluded against existing keeps prior value when the new value is
+    # NULL; but we want explicit NULLs to take effect. Instead, only update keys
+    # that were sent — drive the SET list from `fields` directly.
+    set_clause = ", ".join(f"{k}=excluded.{k}" for k in fields)
+    sql = (
+        f"INSERT INTO user_state ({','.join(cols)}) VALUES ({placeholders}) "  # noqa: S608
+        f"ON CONFLICT(listing_id) DO UPDATE SET {set_clause}"
+    )
+    with suppress(sqlite3.IntegrityError):
+        conn.execute(sql, [listing_id, *fields.values()])
+        conn.commit()
+    row = conn.execute("SELECT * FROM user_state WHERE listing_id = ?", (listing_id,)).fetchone()
+    return dict(row) if row else {}
 
 
 # --- Zone helpers ---

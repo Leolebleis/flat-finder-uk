@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import feature_pill_editable, poi_metric %}
 {% block title %}{{ listing.title or "Listing" }} - Flat Finder{% endblock %}
 
 {% block head %}
@@ -77,9 +78,7 @@
             <span class="metric">Listed {{ listing.listing_date }}</span>
             {% endif %}
             {% for poi in pois %}
-            {% if poi.id in listing.poi_commutes %}
-            <span class="metric" style="background: var(--poi-bg-{{ poi.color_index % 8 }}); color: var(--poi-color-{{ poi.color_index % 8 }});">{{ listing.poi_commutes[poi.id] }} min to {{ poi.name }}</span>
-            {% endif %}
+            {% if poi.id in listing.poi_commutes %}{{ poi_metric(listing.poi_commutes[poi.id], poi) }}{% endif %}
             {% endfor %}
             {% if listing.zone %}
             <span class="metric">{{ listing.zone }}</span>
@@ -89,35 +88,9 @@
         <div class="detail__features">
             <h3 class="detail__label">Features <span class="detail__label-hint">(click to edit)</span></h3>
             <div class="detail__pills">
-                <span class="pill pill--{{ 'yes' if listing.has_dishwasher == 'yes' else ('no' if listing.has_dishwasher == 'no' else 'unknown') }}{% if listing.override_dishwasher %} pill--overridden{% endif %}"
-                      data-action="cycle-pill"
-                      data-id="{{ listing.id }}"
-                      data-field="override_dishwasher"
-                      data-value="{{ listing.has_dishwasher }}"
-                      data-original="{{ listing.original_dishwasher }}"
-                      title="Click to change">
-                    {{ "Dishwasher" if listing.has_dishwasher == 'yes' else ("No dishwasher" if listing.has_dishwasher == 'no' else "Dishwasher?") }}
-                </span>
-
-                <span class="pill pill--{{ 'yes' if listing.has_washer == 'yes' else ('no' if listing.has_washer == 'no' else 'unknown') }}{% if listing.override_washer %} pill--overridden{% endif %}"
-                      data-action="cycle-pill"
-                      data-id="{{ listing.id }}"
-                      data-field="override_washer"
-                      data-value="{{ listing.has_washer }}"
-                      data-original="{{ listing.original_washer }}"
-                      title="Click to change">
-                    {{ "Washer" if listing.has_washer == 'yes' else ("No washer" if listing.has_washer == 'no' else "Washer?") }}
-                </span>
-
-                <span class="pill pill--{{ 'yes' if listing.has_outdoor == 'yes' else ('no' if listing.has_outdoor == 'no' else 'unknown') }}{% if listing.override_outdoor %} pill--overridden{% endif %}"
-                      data-action="cycle-pill"
-                      data-id="{{ listing.id }}"
-                      data-field="override_outdoor"
-                      data-value="{{ listing.has_outdoor }}"
-                      data-original="{{ listing.original_outdoor }}"
-                      title="Click to change">
-                    {{ (listing.outdoor_type or "Outdoor") if listing.has_outdoor == 'yes' else ("No outdoor" if listing.has_outdoor == 'no' else "Outdoor?") }}
-                </span>
+                {{ feature_pill_editable(listing.id, "override_dishwasher", listing.has_dishwasher, listing.override_dishwasher, listing.original_dishwasher, "Dishwasher", "No dishwasher", "Dishwasher?") }}
+                {{ feature_pill_editable(listing.id, "override_washer", listing.has_washer, listing.override_washer, listing.original_washer, "Washer", "No washer", "Washer?") }}
+                {{ feature_pill_editable(listing.id, "override_outdoor", listing.has_outdoor, listing.override_outdoor, listing.original_outdoor, listing.outdoor_type or "Outdoor", "No outdoor", "Outdoor?") }}
             </div>
         </div>
 

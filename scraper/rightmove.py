@@ -5,22 +5,11 @@ from datetime import UTC, datetime
 from urllib.parse import urlencode
 
 import requests
+from shared.scraping import HTTP_HEADERS, check_description, should_exclude_text
 
 SEARCH_URL = "https://www.rightmove.co.uk/property-to-rent/find.html"
-EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
-OUTDOOR_PATTERNS = {
-    r"\bgarden\b": "garden",
-    r"\bbalcony\b": "balcony",
-    r"\bterrace\b": "terrace",
-    r"\bpatio\b": "patio",
-    r"\boutdoor\b": "outdoor space",
-}
-OUTDOOR_EXCLUDE = re.compile(r"\b(communal|shared|residents)\s+garden", re.IGNORECASE)
-STREET_GARDENS = re.compile(r"\b\w+\s+gardens\b", re.IGNORECASE)
-APPLIANCE_PATTERNS = {
-    "has_dishwasher": [r"dishwasher", r"dish washer", r"dish-washer"],
-    "has_washer": [r"washing machine", r"washer[\s/-]?dryer", r"laundry"],
-}
+PAGE_SIZE = 24
+
 FURNISH_PATTERNS = [
     (r"\bunfurnished\b", "Unfurnished"),
     (r"\bpart[- ]?furnished\b", "Part furnished"),
@@ -37,7 +26,7 @@ def build_search_url(  # noqa: PLR0913
         "minBedrooms": min_beds,
         "maxBedrooms": max_beds,
         "maxPrice": max_price,
-        "numberOfPropertiesPerPage": 24,
+        "numberOfPropertiesPerPage": PAGE_SIZE,
         "channel": "RENT",
         "index": index,
         "sortType": 6,  # newest listed
@@ -47,23 +36,6 @@ def build_search_url(  # noqa: PLR0913
         "areaSizeUnit": "sqft",
     }
     return f"{SEARCH_URL}?{urlencode(params)}"
-
-
-def _check_description(text: str) -> dict:
-    text_lower = text.lower()
-    result = {}
-    for key, patterns in APPLIANCE_PATTERNS.items():
-        result[key] = "yes" if any(re.search(p, text_lower) for p in patterns) else "unknown"
-    outdoor_found = []
-    # Strip false positives before matching garden
-    text_filtered = OUTDOOR_EXCLUDE.sub("", text_lower)
-    text_filtered = STREET_GARDENS.sub("", text_filtered)
-    for pattern, label in OUTDOOR_PATTERNS.items():
-        if re.search(pattern, text_filtered):
-            outdoor_found.append(label)
-    result["has_outdoor"] = "yes" if outdoor_found else "unknown"
-    result["outdoor_type"] = ", ".join(outdoor_found) if outdoor_found else None
-    return result
 
 
 def _parse_sqft(size_str: str | None) -> int | None:
@@ -76,10 +48,9 @@ def _parse_sqft(size_str: str | None) -> int | None:
 
 
 def _should_exclude(prop: dict) -> bool:
-    text = (
+    return should_exclude_text(
         f"{prop.get('propertyTypeFullDescription', '')} {prop.get('summary', '')} {prop.get('displayAddress', '')}"
-    ).lower()
-    return any(term in text for term in EXCLUDE_TERMS)
+    )
 
 
 def _get_monthly_price(price_data: dict) -> int | None:
@@ -108,7 +79,7 @@ def parse_rightmove_response(data: dict) -> list[dict]:
         if _should_exclude(prop):
             continue
         description = prop.get("summary", "")
-        desc_flags = _check_description(description)
+        desc_flags = check_description(description)
         images = prop.get("propertyImages", {}).get("images", [])
         image_url = images[0]["srcUrl"] if images else None
         price_data = prop.get("price", {})
@@ -150,16 +121,9 @@ def _extract_next_data(html: str) -> dict:
 def fetch_rightmove(location_id: str, radius: float, min_beds: int, max_beds: int, max_price: int) -> list[dict]:
     all_listings = []
     index = 0
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    }
     while True:
         url = build_search_url(location_id, radius, min_beds, max_beds, max_price, index)
-        resp = requests.get(url, headers=headers, timeout=30)
+        resp = requests.get(url, headers=HTTP_HEADERS, timeout=30)
         resp.raise_for_status()
         next_data = _extract_next_data(resp.text)
         search_results = next_data["props"]["pageProps"]["searchResults"]
@@ -170,7 +134,7 @@ def fetch_rightmove(location_id: str, radius: float, min_beds: int, max_beds: in
         result_count = search_results.get("resultCount", "0")
         if isinstance(result_count, str):
             result_count = int(result_count.replace(",", ""))
-        if index + 24 >= result_count:
+        if index + PAGE_SIZE >= result_count:
             break
-        index += 24
+        index += PAGE_SIZE
     return all_listings

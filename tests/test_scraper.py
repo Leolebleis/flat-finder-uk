@@ -36,8 +36,6 @@ def _make_listing(listing_id: str = "rightmove_1", price: int = 1800) -> dict:
         "has_outdoor": "unknown",
         "outdoor_type": None,
         "zone": None,
-        "commute_mins": None,
-        "gym_commute_mins": None,
         "first_seen": datetime.now(UTC).isoformat(),
         "listing_date": None,
     }
