@@ -1,5 +1,6 @@
 import pytest
-from scraper.rightmove import _check_description, _extract_next_data, build_search_url, parse_rightmove_response
+from scraper.rightmove import _extract_next_data, build_search_url, parse_rightmove_response
+from shared.scraping import check_description
 
 
 def test_build_search_url_includes_parameters():
@@ -146,43 +147,43 @@ def test_extract_next_data_raises_on_missing():
 
 
 def test_check_description_communal_garden_not_flagged():
-    result = _check_description("Lovely flat with communal garden and modern kitchen")
+    result = check_description("Lovely flat with communal garden and modern kitchen")
     assert result["has_outdoor"] == "unknown"
 
 
 def test_check_description_shared_garden_not_flagged():
-    result = _check_description("1 bed flat with shared garden near station")
+    result = check_description("1 bed flat with shared garden near station")
     assert result["has_outdoor"] == "unknown"
 
 
 def test_check_description_street_name_gardens_not_flagged():
-    result = _check_description("Located on Maida Vale Gardens, close to shops")
+    result = check_description("Located on Maida Vale Gardens, close to shops")
     assert result["has_outdoor"] == "unknown"
 
 
 def test_check_description_private_garden_flagged():
-    result = _check_description("Beautiful flat with private garden")
+    result = check_description("Beautiful flat with private garden")
     assert result["has_outdoor"] == "yes"
     assert "garden" in result["outdoor_type"]
 
 
 def test_check_description_just_garden_flagged():
-    result = _check_description("Spacious flat with garden and parking")
+    result = check_description("Spacious flat with garden and parking")
     assert result["has_outdoor"] == "yes"
     assert "garden" in result["outdoor_type"]
 
 
 def test_check_description_balcony_still_works():
-    result = _check_description("Modern flat with balcony overlooking park")
+    result = check_description("Modern flat with balcony overlooking park")
     assert result["has_outdoor"] == "yes"
     assert "balcony" in result["outdoor_type"]
 
 
 def test_check_description_patio_substring_not_flagged():
-    result = _check_description("available for immediate occupation")
+    result = check_description("available for immediate occupation")
     assert result["has_outdoor"] == "unknown"
 
 
 def test_check_description_terrace_substring_not_flagged():
-    result = _check_description("a characterful terraced house in NW6")
+    result = check_description("a characterful terraced house in NW6")
     assert result["has_outdoor"] == "unknown"

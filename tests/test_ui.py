@@ -19,19 +19,6 @@ from shared.models import (
     upsert_poi_commute,
 )
 
-USER_STATE_SCHEMA = """
-CREATE TABLE IF NOT EXISTS user_state (
-    listing_id          TEXT PRIMARY KEY,
-    seen                BOOLEAN DEFAULT 0,
-    favourite           BOOLEAN DEFAULT 0,
-    notes               TEXT,
-    override_dishwasher TEXT,
-    override_washer     TEXT,
-    override_outdoor    TEXT,
-    updated_at          DATETIME
-);
-"""
-
 SAMPLE_LISTING = {
     "id": "rightmove_1",
     "source": "rightmove",
@@ -65,18 +52,12 @@ def _make_app(db_path: Path):
 
 
 def _setup_db(db_path: Path):
-    """Init listings + user_state tables."""
+    """Init schema (init_db now creates user_state too)."""
     init_db(db_path)
-    conn = get_connection(db_path)
-    conn.execute(USER_STATE_SCHEMA)
-    conn.commit()
-    conn.close()
 
 
-def _seed_listing(db_path: Path, listing: dict | None = None, gym_commute_mins: int | None = None):
+def _seed_listing(db_path: Path, listing: dict | None = None):
     data = listing or dict(SAMPLE_LISTING)
-    if gym_commute_mins is not None:
-        data = {**data, "gym_commute_mins": gym_commute_mins}
     conn = get_connection(db_path)
     insert_listing(conn, data)
     conn.close()
@@ -265,7 +246,7 @@ def test_feed_page_shows_gym_commute():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
         _setup_db(db_path)
-        _seed_listing(db_path, gym_commute_mins=12)
+        _seed_listing(db_path)
         conn = get_connection(db_path)
         poi_id = insert_poi(conn, "Gym", 51.5445, -0.1762, 1)
         upsert_poi_commute(conn, "rightmove_1", poi_id, 12)
@@ -284,23 +265,11 @@ def test_feed_page_best_match_sort():
         _setup_db(db_path)
         _seed_listing(
             db_path,
-            {
-                **SAMPLE_LISTING,
-                "id": "close_gym",
-                "latitude": 51.544,
-                "longitude": -0.176,
-                "commute_mins": 60,
-            },
+            {**SAMPLE_LISTING, "id": "close_gym", "latitude": 51.544, "longitude": -0.176},
         )
         _seed_listing(
             db_path,
-            {
-                **SAMPLE_LISTING,
-                "id": "short_commute",
-                "latitude": 51.49,
-                "longitude": -0.18,
-                "commute_mins": 30,
-            },
+            {**SAMPLE_LISTING, "id": "short_commute", "latitude": 51.49, "longitude": -0.18},
         )
         conn = get_connection(db_path)
         poi_id = insert_poi(conn, "Work", 51.4869, -0.1832, 0)

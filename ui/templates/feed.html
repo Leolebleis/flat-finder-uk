@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import feature_pill, poi_metric %}
 {% block title %}Feed - Flat Finder{% endblock %}
 {% block content %}
 
@@ -102,9 +103,7 @@
 
             <div class="listing-card__metrics">
                 {% for poi in pois %}
-                {% if poi.id in l.poi_commutes %}
-                <span class="metric" style="background: var(--poi-bg-{{ poi.color_index % 8 }}); color: var(--poi-color-{{ poi.color_index % 8 }});">{{ l.poi_commutes[poi.id] }} min to {{ poi.name }}</span>
-                {% endif %}
+                {% if poi.id in l.poi_commutes %}{{ poi_metric(l.poi_commutes[poi.id], poi) }}{% endif %}
                 {% endfor %}
                 {% if l.distance_mi is not none %}
                 <span class="metric metric--station">{{ l.distance_mi }} mi from stn</span>
@@ -112,29 +111,9 @@
             </div>
 
             <div class="listing-card__features">
-                {% if l.has_dishwasher == 'yes' %}
-                <span class="pill pill--yes">Dishwasher</span>
-                {% elif l.has_dishwasher == 'no' %}
-                <span class="pill pill--no">No dishwasher</span>
-                {% else %}
-                <span class="pill pill--unknown">Dishwasher?</span>
-                {% endif %}
-
-                {% if l.has_washer == 'yes' %}
-                <span class="pill pill--yes">Washer</span>
-                {% elif l.has_washer == 'no' %}
-                <span class="pill pill--no">No washer</span>
-                {% else %}
-                <span class="pill pill--unknown">Washer?</span>
-                {% endif %}
-
-                {% if l.has_outdoor == 'yes' %}
-                <span class="pill pill--yes">{{ l.outdoor_type or "Outdoor" }}</span>
-                {% elif l.has_outdoor == 'no' %}
-                <span class="pill pill--no">No outdoor</span>
-                {% else %}
-                <span class="pill pill--unknown">Outdoor?</span>
-                {% endif %}
+                {{ feature_pill(l.has_dishwasher, "Dishwasher", "No dishwasher", "Dishwasher?") }}
+                {{ feature_pill(l.has_washer, "Washer", "No washer", "Washer?") }}
+                {{ feature_pill(l.has_outdoor, l.outdoor_type or "Outdoor", "No outdoor", "Outdoor?") }}
             </div>
 
             <div class="listing-card__footer">

@@ -103,17 +103,8 @@
     var zoneList = document.getElementById("zone-list");
     var zoneEmpty = document.getElementById("zone-empty");
 
-    // Color palette matching POI_COLORS
-    var ZONE_COLORS = [
-        {color: "#1d4ed8", bg: "#dbeafe"},
-        {color: "#c2410c", bg: "#ffedd5"},
-        {color: "#7c3aed", bg: "#ede9fe"},
-        {color: "#0f766e", bg: "#ccfbf1"},
-        {color: "#be123c", bg: "#ffe4e6"},
-        {color: "#b45309", bg: "#fef3c7"},
-        {color: "#047857", bg: "#d1fae5"},
-        {color: "#475569", bg: "#f1f5f9"},
-    ];
+    // Color palette injected from Python (single source of truth)
+    var ZONE_COLORS = {{ poi_colors | tojson }};
 
     function initMap() {
         if (zoneMap) return;
