@@ -18,12 +18,24 @@ Design docs: `../../docs/plans/2026-02-26-flat-finder-design.md`, `../../docs/pl
 - **shared/config.py** -- env var config + `load_zones()` from JSON
 - **shared/geo.py** -- Google Maps URL parser (extracts lat/lng from full URLs and short links)
 
+## Tooling
+- Dep manager: `uv` (single `pyproject.toml` + `uv.lock` at repo root)
+- Python: 3.13 (pinned in `.python-version`)
+- Lint/format: `ruff` (config in `pyproject.toml`, `select=ALL` with `D/COM812/ISC001` ignored)
+- Type check: `ty` (Astral)
+- Tests: `pytest` + `pytest-cov` + `pytest-asyncio`
+- CI: GitHub Actions (`.github/workflows/ci.yml`) -- lint, type-check, test on push/PR to main
+- Both Dockerfiles use a uv multi-stage build; the project is installed as a wheel containing `shared/`, `scraper/`, `ui/` (including templates/static)
+
 ## Key commands
-- Rebuild: `docker compose up -d --build` (from this directory)
+- Install/sync deps: `uv sync`
+- Run tests: `uv run pytest -v`
+- Lint: `uv run ruff check .` / `uv run ruff format .`
+- Type check: `uv run ty check shared/ scraper/ ui/`
+- Rebuild containers: `docker compose up -d --build` (from this directory)
 - Scraper logs: `docker logs flat-finder-scraper`
 - UI logs: `docker logs flat-finder`
 - UI URL: https://raspberrypi/flat/
-- Run tests: `.venv/bin/python -m pytest tests/ -v`
 
 ## Key coordinates
 - **Places of Interest**: User-configurable via Settings page (`/flat/settings`). Stored in `pois` table. Commute times in `poi_commutes` table.
