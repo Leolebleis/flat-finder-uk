@@ -18,7 +18,7 @@ def test_tfl_journey_mins_returns_shortest():
         result = tfl_journey_mins(51.5100, -0.1300, 51.5074, -0.1278)
     assert result == 32
     call_url = mock_get.call_args[0][0]
-    assert "51.5472,-0.1803" in call_url
+    assert "51.51,-0.13" in call_url
     assert "51.5074,-0.1278" in call_url
 
 

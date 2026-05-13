@@ -70,7 +70,6 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Flat Finder UI", root_path="/flat", lifespan=lifespan)
 
 
-
 def _apply_overrides(d: dict[str, Any]) -> None:
     """Apply user_state override_* values onto the live has_* fields, in place."""
     for override_key, target_key in _OVERRIDE_FIELDS:
