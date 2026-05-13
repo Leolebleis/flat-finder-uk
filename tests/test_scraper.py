@@ -1,22 +1,39 @@
 # tests/test_scraper.py
-import sqlite3
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-from shared.models import init_db, get_connection, insert_listing, get_state, set_state
-from scraper.scraper import process_new_listings, is_first_run, _listing_fingerprint, _normalize_address
+from unittest.mock import patch
+
+from scraper.scraper import _listing_fingerprint, _normalize_address, is_first_run, process_new_listings
+from shared.models import get_connection, init_db, insert_listing, set_state
+
 
 def _make_listing(id="rightmove_1", price=1800):
     return {
-        "id": id, "source": "rightmove", "url": "https://example.com",
-        "title": "1 bed flat", "price_pcm": price, "bedrooms": 1,
-        "address": "NW6", "latitude": 51.54, "longitude": -0.17,
-        "description": "Nice flat", "image_url": None, "property_type": "flat",
-        "furnishing": "Furnished", "sqft": None, "has_dishwasher": "unknown",
-        "has_washer": "unknown", "has_outdoor": "unknown", "outdoor_type": None,
-        "zone": None, "commute_mins": None, "gym_commute_mins": None,
-        "first_seen": "2026-02-26T12:00:00+00:00", "listing_date": None,
+        "id": id,
+        "source": "rightmove",
+        "url": "https://example.com",
+        "title": "1 bed flat",
+        "price_pcm": price,
+        "bedrooms": 1,
+        "address": "NW6",
+        "latitude": 51.54,
+        "longitude": -0.17,
+        "description": "Nice flat",
+        "image_url": None,
+        "property_type": "flat",
+        "furnishing": "Furnished",
+        "sqft": None,
+        "has_dishwasher": "unknown",
+        "has_washer": "unknown",
+        "has_outdoor": "unknown",
+        "outdoor_type": None,
+        "zone": None,
+        "commute_mins": None,
+        "gym_commute_mins": None,
+        "first_seen": "2026-02-26T12:00:00+00:00",
+        "listing_date": None,
     }
+
 
 def test_is_first_run_true_on_empty_db():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -26,6 +43,7 @@ def test_is_first_run_true_on_empty_db():
         assert is_first_run(conn) is True
         conn.close()
 
+
 def test_is_first_run_false_after_initialised():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -34,6 +52,7 @@ def test_is_first_run_false_after_initialised():
         set_state(conn, "initialised", "true")
         assert is_first_run(conn) is False
         conn.close()
+
 
 def test_process_new_listings_returns_only_new():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -47,6 +66,7 @@ def test_process_new_listings_returns_only_new():
         assert len(new) == 1
         assert new[0]["id"] == "rightmove_2"
         conn.close()
+
 
 def test_process_new_listings_preserves_zone():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -104,43 +124,50 @@ def test_listing_fingerprint_none_when_missing_fields():
 def test_scraper_fetches_commutes_for_all_pois():
     """run() should fetch commute times for each POI in the DB."""
     import json as _json
+
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
         init_db(db_path)
         conn = get_connection(db_path)
         from shared.models import insert_poi, insert_zone
+
         poi_id = insert_poi(conn, "Test Place", 51.50, -0.12, 0)
         # Insert a zone that covers the listing location
-        zone_geom = _json.dumps({
-            "type": "Polygon",
-            "coordinates": [[
-                [-0.20, 51.50], [-0.10, 51.50],
-                [-0.10, 51.60], [-0.20, 51.60],
-                [-0.20, 51.50]
-            ]]
-        })
-        insert_zone(conn, "Test Zone", zone_geom,
-                     centroid_lat=51.55, centroid_lng=-0.15,
-                     covering_radius_km=5.0,
-                     rightmove_id="X", openrent_term="X",
-                     color_index=0)
+        zone_geom = _json.dumps(
+            {
+                "type": "Polygon",
+                "coordinates": [[[-0.20, 51.50], [-0.10, 51.50], [-0.10, 51.60], [-0.20, 51.60], [-0.20, 51.50]]],
+            }
+        )
+        insert_zone(
+            conn,
+            "Test Zone",
+            zone_geom,
+            centroid_lat=51.55,
+            centroid_lng=-0.15,
+            covering_radius_km=5.0,
+            rightmove_id="X",
+            openrent_term="X",
+            color_index=0,
+        )
         conn.close()
         listing = _make_listing("rm_new")
         listing["latitude"] = 51.54
         listing["longitude"] = -0.17
-        with patch("scraper.scraper.fetch_rightmove", return_value=[listing]), \
-             patch("scraper.scraper.fetch_openrent", return_value=[]), \
-             patch("scraper.scraper.tfl_journey_mins", return_value=25) as mock_tfl, \
-             patch("scraper.scraper.DB_PATH", db_path), \
-             patch("scraper.scraper.NTFY_TOPIC", ""), \
-             patch("scraper.scraper.GMAIL_ADDRESS", ""), \
-             patch("scraper.scraper.GMAIL_APP_PASSWORD", ""):
+        with (
+            patch("scraper.scraper.fetch_rightmove", return_value=[listing]),
+            patch("scraper.scraper.fetch_openrent", return_value=[]),
+            patch("scraper.scraper.tfl_journey_mins", return_value=25),
+            patch("scraper.scraper.DB_PATH", db_path),
+            patch("scraper.scraper.NTFY_TOPIC", ""),
+            patch("scraper.scraper.GMAIL_ADDRESS", ""),
+            patch("scraper.scraper.GMAIL_APP_PASSWORD", ""),
+        ):
             from scraper.scraper import run
+
             run()
         conn = get_connection(db_path)
-        commutes = conn.execute(
-            "SELECT * FROM poi_commutes WHERE listing_id = 'rm_new'"
-        ).fetchall()
+        commutes = conn.execute("SELECT * FROM poi_commutes WHERE listing_id = 'rm_new'").fetchall()
         conn.close()
         assert len(commutes) == 1
         assert commutes[0]["poi_id"] == poi_id
@@ -148,16 +175,15 @@ def test_scraper_fetches_commutes_for_all_pois():
 
 
 import json
+
 from scraper.scraper import _filter_listings_by_zone
 
-ZONE_GEOM = json.dumps({
-    "type": "Polygon",
-    "coordinates": [[
-        [-0.19, 51.54], [-0.17, 51.54],
-        [-0.17, 51.56], [-0.19, 51.56],
-        [-0.19, 51.54]
-    ]]
-})
+ZONE_GEOM = json.dumps(
+    {
+        "type": "Polygon",
+        "coordinates": [[[-0.19, 51.54], [-0.17, 51.54], [-0.17, 51.56], [-0.19, 51.56], [-0.19, 51.54]]],
+    }
+)
 
 
 def test_filter_listings_keeps_inside():

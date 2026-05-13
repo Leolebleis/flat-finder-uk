@@ -1,9 +1,10 @@
 import json
 import math
 import re
-import requests
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlencode
+
+import requests
 
 SEARCH_URL = "https://www.rightmove.co.uk/property-to-rent/find.html"
 EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
@@ -27,8 +28,9 @@ FURNISH_PATTERNS = [
 ]
 
 
-def build_search_url(location_id: str, radius: float, min_beds: int,
-                     max_beds: int, max_price: int, index: int = 0) -> str:
+def build_search_url(
+    location_id: str, radius: float, min_beds: int, max_beds: int, max_price: int, index: int = 0
+) -> str:
     params = {
         "locationIdentifier": location_id,
         "radius": radius,
@@ -126,7 +128,7 @@ def parse_rightmove_response(data: dict) -> list[dict]:
             "property_type": prop.get("propertySubType") or prop.get("propertyTypeFullDescription"),
             "furnishing": furnishing,
             "sqft": _parse_sqft(prop.get("displaySize")),
-            "first_seen": datetime.now(timezone.utc).isoformat(),
+            "first_seen": datetime.now(UTC).isoformat(),
             "listing_date": prop.get("firstVisibleDate"),
             **desc_flags,
         }
@@ -138,12 +140,12 @@ def _extract_next_data(html: str) -> dict:
     """Extract __NEXT_DATA__ JSON from Rightmove HTML page."""
     match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html)
     if not match:
-        raise ValueError("Could not find __NEXT_DATA__ in Rightmove HTML")
+        msg = "Could not find __NEXT_DATA__ in Rightmove HTML"
+        raise ValueError(msg)
     return json.loads(match.group(1))
 
 
-def fetch_rightmove(location_id: str, radius: float, min_beds: int,
-                    max_beds: int, max_price: int) -> list[dict]:
+def fetch_rightmove(location_id: str, radius: float, min_beds: int, max_beds: int, max_price: int) -> list[dict]:
     all_listings = []
     index = 0
     headers = {

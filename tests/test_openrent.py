@@ -244,7 +244,9 @@ def test_parse_openrent_html_listing_fields():
     listings = parse_openrent_html(FIXTURE_HTML)
     listing = next(l for l in listings if l["id"] == "openrent_2746356")
     assert listing["source"] == "openrent"
-    assert listing["url"] == "https://www.openrent.co.uk/property-to-rent/london/1-bed-flat-goldhurst-terrace-nw6/2746356"
+    assert (
+        listing["url"] == "https://www.openrent.co.uk/property-to-rent/london/1-bed-flat-goldhurst-terrace-nw6/2746356"
+    )
     assert listing["title"] == "1 Bed Flat, Goldhurst Terrace, NW6"
     assert listing["price_pcm"] == 2100
     assert listing["bedrooms"] == 1

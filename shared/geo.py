@@ -1,12 +1,13 @@
-import re
 import logging
+import re
+
 import requests
 
 log = logging.getLogger("flat-finder")
 
 _COORD_PATTERNS = [
-    re.compile(r"@(-?\d+\.\d+),(-?\d+\.\d+)"),       # @lat,lng in path
-    re.compile(r"[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)"),   # ?q=lat,lng
+    re.compile(r"@(-?\d+\.\d+),(-?\d+\.\d+)"),  # @lat,lng in path
+    re.compile(r"[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)"),  # ?q=lat,lng
 ]
 
 
@@ -29,6 +30,6 @@ def extract_coords_from_url(url: str) -> tuple[float, float] | None:
             resp = requests.head(url, allow_redirects=True, timeout=10)
             url = resp.url
         except Exception as e:
-            log.error(f"Failed to resolve short URL {url}: {e}")
+            log.exception(f"Failed to resolve short URL {url}: {e}")
             return None
     return _extract_from_text(url)

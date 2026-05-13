@@ -2,29 +2,40 @@
 import logging
 import math
 import os
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-
-from shared.models import (init_db, get_connection, get_listings,
-                           get_pois, insert_poi, delete_poi,
-                           get_poi_commutes_for_listings, upsert_poi_commute,
-                           get_zones, insert_zone, update_zone, delete_zone)
 from shared.geo import extract_coords_from_url
+from shared.models import (
+    delete_poi,
+    delete_zone,
+    get_connection,
+    get_poi_commutes_for_listings,
+    get_pois,
+    get_zones,
+    init_db,
+    insert_poi,
+    insert_zone,
+    update_zone,
+    upsert_poi_commute,
+)
 from shared.zones import compute_zone_params, resolve_postcode, resolve_rightmove_id
 
 log = logging.getLogger("flat-finder-ui")
 
-UI_DB_PATH = Path(os.environ.get(
-    "FLAT_FINDER_UI_DB",
-    "/home/leo/flat-finder-ui.db",
-))
+UI_DB_PATH = Path(
+    os.environ.get(
+        "FLAT_FINDER_UI_DB",
+        "/home/leo/flat-finder-ui.db",
+    )
+)
 
 USER_STATE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS user_state (
@@ -46,10 +57,8 @@ def _init_user_state_table(db_path: Path) -> None:
     conn.execute(USER_STATE_SCHEMA)
     # Migrate existing databases: add override columns if missing
     for col in ["override_dishwasher", "override_washer", "override_outdoor"]:
-        try:
+        with suppress(Exception):
             conn.execute(f"ALTER TABLE user_state ADD COLUMN {col} TEXT")
-        except Exception:
-            pass
     conn.commit()
     conn.close()
 
@@ -69,29 +78,27 @@ STATION_LAT = 51.5472
 STATION_LNG = -0.1803
 
 POI_COLORS = [
-    {"name": "blue",    "color": "#1d4ed8", "bg": "#dbeafe", "dark_color": "#93c5fd", "dark_bg": "#172554"},
-    {"name": "orange",  "color": "#c2410c", "bg": "#ffedd5", "dark_color": "#fdba74", "dark_bg": "#431407"},
-    {"name": "purple",  "color": "#7c3aed", "bg": "#ede9fe", "dark_color": "#c4b5fd", "dark_bg": "#2e1065"},
-    {"name": "teal",    "color": "#0f766e", "bg": "#ccfbf1", "dark_color": "#2dd4bf", "dark_bg": "#042f2e"},
-    {"name": "rose",    "color": "#be123c", "bg": "#ffe4e6", "dark_color": "#fda4af", "dark_bg": "#4c0519"},
-    {"name": "amber",   "color": "#b45309", "bg": "#fef3c7", "dark_color": "#fcd34d", "dark_bg": "#451a03"},
+    {"name": "blue", "color": "#1d4ed8", "bg": "#dbeafe", "dark_color": "#93c5fd", "dark_bg": "#172554"},
+    {"name": "orange", "color": "#c2410c", "bg": "#ffedd5", "dark_color": "#fdba74", "dark_bg": "#431407"},
+    {"name": "purple", "color": "#7c3aed", "bg": "#ede9fe", "dark_color": "#c4b5fd", "dark_bg": "#2e1065"},
+    {"name": "teal", "color": "#0f766e", "bg": "#ccfbf1", "dark_color": "#2dd4bf", "dark_bg": "#042f2e"},
+    {"name": "rose", "color": "#be123c", "bg": "#ffe4e6", "dark_color": "#fda4af", "dark_bg": "#4c0519"},
+    {"name": "amber", "color": "#b45309", "bg": "#fef3c7", "dark_color": "#fcd34d", "dark_bg": "#451a03"},
     {"name": "emerald", "color": "#047857", "bg": "#d1fae5", "dark_color": "#34d399", "dark_bg": "#064e3b"},
-    {"name": "slate",   "color": "#475569", "bg": "#f1f5f9", "dark_color": "#94a3b8", "dark_bg": "#1e293b"},
+    {"name": "slate", "color": "#475569", "bg": "#f1f5f9", "dark_color": "#94a3b8", "dark_bg": "#1e293b"},
 ]
+
 
 def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calculate distance in miles between two coordinates."""
     R = 3958.8  # Earth radius in miles
     dlat = math.radians(lat2 - lat1)
     dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlng / 2) ** 2)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def _compute_scores(listings: list[dict], poi_ids: list[int],
-                    weights: dict[int, float] | None = None) -> None:
+def _compute_scores(listings: list[dict], poi_ids: list[int], weights: dict[int, float] | None = None) -> None:
     """Compute weighted match scores in-place using dynamic POIs."""
     if not poi_ids:
         for l in listings:
@@ -99,14 +106,13 @@ def _compute_scores(listings: list[dict], poi_ids: list[int],
         return
     if weights is None:
         w = 1.0 / len(poi_ids)
-        weights = {pid: w for pid in poi_ids}
+        weights = dict.fromkeys(poi_ids, w)
     total = sum(weights.values())
     if total > 0:
         weights = {k: v / total for k, v in weights.items()}
     stats: dict[int, dict] = {}
     for pid in poi_ids:
-        vals = [l["poi_commutes"][pid] for l in listings
-                if pid in l.get("poi_commutes", {})]
+        vals = [l["poi_commutes"][pid] for l in listings if pid in l.get("poi_commutes", {})]
         if vals:
             mn, mx = min(vals), max(vals)
             stats[pid] = {"min": mn, "max": mx, "range": mx - mn if mx != mn else 1}
@@ -134,17 +140,18 @@ SORT_OPTIONS = {
 def _sort_listings(listings: list[dict], sort: str) -> list[dict]:
     if sort == "best_match":
         return sorted(listings, key=lambda l: -(l.get("match_score") or 0))
-    elif sort == "price_asc":
+    if sort == "price_asc":
         return sorted(listings, key=lambda l: (l["price_pcm"] is None, l["price_pcm"] or 0))
-    elif sort == "price_desc":
+    if sort == "price_desc":
         return sorted(listings, key=lambda l: (l["price_pcm"] is None, -(l["price_pcm"] or 0)))
-    elif sort == "size_desc":
+    if sort == "size_desc":
         return sorted(listings, key=lambda l: (l["sqft"] is None, -(l["sqft"] or 0)))
-    elif sort == "distance":
+    if sort == "distance":
         return sorted(listings, key=lambda l: (l["distance_mi"] is None, l["distance_mi"] or 999))
-    elif sort == "commute":
+    if sort == "commute":
         return sorted(listings, key=lambda l: (l.get("commute_mins") is None, l.get("commute_mins") or 999))
     return listings  # newest - already sorted by first_seen DESC from SQL
+
 
 # Templates and static files
 _ui_dir = Path(__file__).resolve().parent
@@ -153,6 +160,7 @@ app.mount("/static", StaticFiles(directory=str(_ui_dir / "static")), name="stati
 
 
 # --- Data helpers ---
+
 
 def _get_feed_data(sort: str, zone: str) -> dict:
     """Build feed page context data."""
@@ -173,9 +181,7 @@ def _get_feed_data(sort: str, zone: str) -> dict:
         d["seen"] = bool(d["seen"]) if d["seen"] else False
         d["favourite"] = bool(d["favourite"]) if d["favourite"] else False
         if d.get("latitude") and d.get("longitude"):
-            d["distance_mi"] = round(_haversine_miles(
-                STATION_LAT, STATION_LNG, d["latitude"], d["longitude"]
-            ), 2)
+            d["distance_mi"] = round(_haversine_miles(STATION_LAT, STATION_LNG, d["latitude"], d["longitude"]), 2)
         else:
             d["distance_mi"] = None
         if d.get("override_dishwasher"):
@@ -185,7 +191,7 @@ def _get_feed_data(sort: str, zone: str) -> dict:
         if d.get("override_outdoor"):
             d["has_outdoor"] = d["override_outdoor"]
         listings.append(d)
-    zones = sorted(set(d.get("zone") or "Unknown" for d in listings))
+    zones = sorted({d.get("zone") or "Unknown" for d in listings})
     if zone != "all":
         listings = [l for l in listings if (l.get("zone") or "Unknown") == zone]
     # Load POIs and their commute data
@@ -214,16 +220,12 @@ def _get_feed_data(sort: str, zone: str) -> dict:
 def _get_detail_data(listing_id: str) -> dict:
     """Build detail page context data."""
     conn = get_connection(UI_DB_PATH)
-    row = conn.execute(
-        "SELECT * FROM listings WHERE id = ?", (listing_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM listings WHERE id = ?", (listing_id,)).fetchone()
     if not row:
         conn.close()
         raise HTTPException(status_code=404, detail="Listing not found")
     listing = dict(row)
-    state_row = conn.execute(
-        "SELECT * FROM user_state WHERE listing_id = ?", (listing_id,)
-    ).fetchone()
+    state_row = conn.execute("SELECT * FROM user_state WHERE listing_id = ?", (listing_id,)).fetchone()
     conn.close()
     listing["seen"] = bool(state_row["seen"]) if state_row else False
     listing["favourite"] = bool(state_row["favourite"]) if state_row else False
@@ -253,6 +255,7 @@ def _get_detail_data(listing_id: str) -> dict:
 
 # --- Template routes ---
 
+
 @app.get("/", response_class=HTMLResponse, name="feed_page")
 def feed_page(request: Request, sort: str = "newest", zone: str = "all"):
     return templates.TemplateResponse(request, "feed.html", _get_feed_data(sort, zone))
@@ -277,8 +280,9 @@ def settings_page(request: Request):
 
 
 @app.post("/settings/poi", name="add_poi")
-def add_poi(request: Request, name: str = Form(...), maps_url: str = Form(...)):
+def add_poi(request: Request, name: Annotated[str, Form()], maps_url: Annotated[str, Form()]):
     from starlette.responses import RedirectResponse
+
     coords = extract_coords_from_url(maps_url)
     if not coords or not name.strip():
         return RedirectResponse(request.url_for("settings_page"), status_code=303)
@@ -290,6 +294,7 @@ def add_poi(request: Request, name: str = Form(...), maps_url: str = Form(...)):
     conn.close()
     # Trigger backfill in background
     import threading
+
     threading.Thread(target=_backfill_poi, args=(poi_id, lat, lng), daemon=True).start()
     return RedirectResponse(request.url_for("settings_page"), status_code=303)
 
@@ -305,7 +310,9 @@ def delete_poi_route(poi_id: int):
 def _backfill_poi(poi_id: int, poi_lat: float, poi_lng: float) -> None:
     """Background thread: fetch commute times for all listings missing this POI."""
     import time
+
     from scraper.commute import tfl_journey_mins
+
     conn = get_connection(UI_DB_PATH)
     rows = conn.execute(
         """SELECT id, latitude, longitude FROM listings
@@ -328,6 +335,7 @@ def detail_page(listing_id: str, request: Request):
 
 # --- API routes ---
 
+
 class StateUpdate(BaseModel):
     seen: bool | None = None
     favourite: bool | None = None
@@ -341,17 +349,13 @@ class StateUpdate(BaseModel):
 def update_state(listing_id: str, body: StateUpdate):
     conn = get_connection(UI_DB_PATH)
     # Verify listing exists
-    row = conn.execute(
-        "SELECT id FROM listings WHERE id = ?", (listing_id,)
-    ).fetchone()
+    row = conn.execute("SELECT id FROM listings WHERE id = ?", (listing_id,)).fetchone()
     if not row:
         conn.close()
         raise HTTPException(status_code=404, detail="Listing not found")
 
     # Upsert: get existing state or create defaults
-    existing = conn.execute(
-        "SELECT * FROM user_state WHERE listing_id = ?", (listing_id,)
-    ).fetchone()
+    existing = conn.execute("SELECT * FROM user_state WHERE listing_id = ?", (listing_id,)).fetchone()
 
     seen = body.seen if body.seen is not None else (bool(existing["seen"]) if existing else False)
     favourite = body.favourite if body.favourite is not None else (bool(existing["favourite"]) if existing else False)
@@ -368,15 +372,14 @@ def update_state(listing_id: str, body: StateUpdate):
     if "override_outdoor" in body.model_fields_set:
         override_outdoor = body.override_outdoor
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     conn.execute(
         """INSERT OR REPLACE INTO user_state
            (listing_id, seen, favourite, notes,
             override_dishwasher, override_washer, override_outdoor, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (listing_id, int(seen), int(favourite), notes,
-         override_dishwasher, override_washer, override_outdoor, now),
+        (listing_id, int(seen), int(favourite), notes, override_dishwasher, override_washer, override_outdoor, now),
     )
     conn.commit()
     conn.close()
@@ -423,6 +426,7 @@ def api_listings():
 
 # --- Zone API routes ---
 
+
 @app.get("/api/zones")
 def api_zones():
     conn = get_connection(UI_DB_PATH)
@@ -436,6 +440,7 @@ def api_zones():
 @app.post("/api/zones")
 def api_create_zone(body: dict):
     import json as _json
+
     geometry = body.get("geometry")
     name = body.get("name", "").strip()
     if not geometry or not name:
@@ -447,7 +452,9 @@ def api_create_zone(body: dict):
     existing_zones = get_zones(conn)
     color_index = len(existing_zones) % len(POI_COLORS)
     zone_id = insert_zone(
-        conn, name, _json.dumps(geometry),
+        conn,
+        name,
+        _json.dumps(geometry),
         centroid_lat=params["centroid_lat"],
         centroid_lng=params["centroid_lng"],
         covering_radius_km=params["covering_radius_km"],
@@ -465,6 +472,7 @@ def api_create_zone(body: dict):
 @app.put("/api/zones/{zone_id}")
 def api_update_zone(zone_id: int, body: dict):
     import json as _json
+
     geometry = body.get("geometry")
     name = body.get("name", "").strip()
     if not geometry or not name:
@@ -473,13 +481,17 @@ def api_update_zone(zone_id: int, body: dict):
     postcode = resolve_postcode(params["centroid_lat"], params["centroid_lng"])
     rightmove_id = resolve_rightmove_id(postcode) if postcode else None
     conn = get_connection(UI_DB_PATH)
-    update_zone(conn, zone_id,
-                name=name, geometry=_json.dumps(geometry),
-                centroid_lat=params["centroid_lat"],
-                centroid_lng=params["centroid_lng"],
-                covering_radius_km=params["covering_radius_km"],
-                rightmove_id=rightmove_id,
-                openrent_term=postcode)
+    update_zone(
+        conn,
+        zone_id,
+        name=name,
+        geometry=_json.dumps(geometry),
+        centroid_lat=params["centroid_lat"],
+        centroid_lng=params["centroid_lng"],
+        covering_radius_km=params["covering_radius_km"],
+        rightmove_id=rightmove_id,
+        openrent_term=postcode,
+    )
     zones = get_zones(conn)
     zone = next((z for z in zones if z["id"] == zone_id), None)
     conn.close()

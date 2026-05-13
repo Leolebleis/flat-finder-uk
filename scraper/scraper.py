@@ -2,17 +2,39 @@
 import logging
 import re
 import time
-from pathlib import Path
-from shared.models import init_db, get_connection, insert_listing, get_state, set_state, get_pois, upsert_poi_commute, get_zones
-from shared.config import (DB_PATH, MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM,
-                           NTFY_TOPIC, GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+
+from shared.config import (
+    DB_PATH,
+    GMAIL_ADDRESS,
+    GMAIL_APP_PASSWORD,
+    MAX_BEDROOMS,
+    MAX_RENT_PCM,
+    MIN_BEDROOMS,
+    NTFY_TOPIC,
+)
+from shared.models import (
+    get_connection,
+    get_pois,
+    get_state,
+    get_zones,
+    init_db,
+    insert_listing,
+    set_state,
+    upsert_poi_commute,
+)
 from shared.zones import point_in_zone
-from scraper.rightmove import fetch_rightmove
-from scraper.openrent import fetch_openrent
+
 from scraper.commute import tfl_journey_mins
-from scraper.notifier import (format_ntfy_message, format_email_html,
-                               send_ntfy, send_email,
-                               format_failure_message, format_recovery_message)
+from scraper.notifier import (
+    format_email_html,
+    format_failure_message,
+    format_ntfy_message,
+    format_recovery_message,
+    send_email,
+    send_ntfy,
+)
+from scraper.openrent import fetch_openrent
+from scraper.rightmove import fetch_rightmove
 
 log = logging.getLogger("flat-finder")
 
@@ -41,6 +63,7 @@ def _listing_fingerprint(listing: dict) -> tuple | None:
 def is_first_run(conn) -> bool:
     return get_state(conn, "initialised") is None
 
+
 def process_new_listings(conn, listings: list[dict]) -> list[dict]:
     new = []
     for listing in listings:
@@ -48,21 +71,24 @@ def process_new_listings(conn, listings: list[dict]) -> list[dict]:
             new.append(listing)
     return new
 
+
 def _scrape_source(name: str, fetch_fn, conn) -> tuple[list[dict], str | None]:
     try:
         listings = fetch_fn()
         error = None
     except Exception as e:
-        log.error(f"{name} scrape failed: {e}")
+        log.exception(f"{name} scrape failed: {e}")
         listings = []
         error = str(e)
     return listings, error
+
 
 def _notify_safe(fn, *args, **kwargs) -> None:
     try:
         fn(*args, **kwargs)
     except Exception as e:
-        log.error(f"Notification failed: {e}")
+        log.exception(f"Notification failed: {e}")
+
 
 def _handle_failure_state(conn, source: str, error: str | None) -> None:
     state_key = f"{source}_failing"
@@ -79,15 +105,16 @@ def _handle_failure_state(conn, source: str, error: str | None) -> None:
             title, body = format_recovery_message(source)
             _notify_safe(send_ntfy, NTFY_TOPIC, title, body)
 
+
 def _filter_listings_by_zone(listings: list[dict], zone: dict) -> list[dict]:
     """Keep only listings inside the zone polygon. Keep those without coords."""
     geom_str = zone.get("geometry")
     if not geom_str:
         return listings
     return [
-        l for l in listings
-        if not (l.get("latitude") and l.get("longitude"))
-        or point_in_zone(l["latitude"], l["longitude"], geom_str)
+        l
+        for l in listings
+        if not (l.get("latitude") and l.get("longitude")) or point_in_zone(l["latitude"], l["longitude"], geom_str)
     ]
 
 
@@ -110,15 +137,15 @@ def run() -> None:
         rm_listings, rm_error = _scrape_source(
             f"rightmove/{zone['name']}",
             lambda z=zone, r=rm_radius_miles: fetch_rightmove(
-                z.get("rightmove_id", ""), r,
-                MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
+                z.get("rightmove_id", ""), r, MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM
+            ),
             conn,
         )
         or_listings, or_error = _scrape_source(
             f"openrent/{zone['name']}",
             lambda z=zone, r=or_radius_km: fetch_openrent(
-                z.get("openrent_term", ""), r,
-                MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM),
+                z.get("openrent_term", ""), r, MIN_BEDROOMS, MAX_BEDROOMS, MAX_RENT_PCM
+            ),
             conn,
         )
 
@@ -151,8 +178,7 @@ def run() -> None:
     for listing in new_listings:
         if listing.get("latitude") and listing.get("longitude"):
             for poi in pois:
-                mins = tfl_journey_mins(listing["latitude"], listing["longitude"],
-                                        poi["lat"], poi["lng"])
+                mins = tfl_journey_mins(listing["latitude"], listing["longitude"], poi["lat"], poi["lng"])
                 if mins is not None:
                     upsert_poi_commute(conn, listing["id"], poi["id"], mins)
                 time.sleep(0.5)
@@ -172,8 +198,7 @@ def run() -> None:
             if missing:
                 log.info(f"Backfilling '{poi['name']}' commute for {len(missing)} listings")
                 for row in missing:
-                    mins = tfl_journey_mins(row["latitude"], row["longitude"],
-                                            poi["lat"], poi["lng"])
+                    mins = tfl_journey_mins(row["latitude"], row["longitude"], poi["lat"], poi["lng"])
                     if mins is not None:
                         upsert_poi_commute(conn, row["id"], poi["id"], mins)
                     time.sleep(0.5)
@@ -187,16 +212,10 @@ def run() -> None:
         listing["poi_commutes"] = {row["poi_id"]: row["commute_mins"] for row in commute_rows}
 
     # Prune listings older than 2 weeks
-    pruned = conn.execute(
-        "DELETE FROM listings WHERE first_seen < datetime('now', '-14 days')"
-    ).rowcount
+    pruned = conn.execute("DELETE FROM listings WHERE first_seen < datetime('now', '-14 days')").rowcount
     if pruned:
-        conn.execute(
-            "DELETE FROM user_state WHERE listing_id NOT IN (SELECT id FROM listings)"
-        )
-        conn.execute(
-            "DELETE FROM poi_commutes WHERE listing_id NOT IN (SELECT id FROM listings)"
-        )
+        conn.execute("DELETE FROM user_state WHERE listing_id NOT IN (SELECT id FROM listings)")
+        conn.execute("DELETE FROM poi_commutes WHERE listing_id NOT IN (SELECT id FROM listings)")
         conn.commit()
         log.info(f"Pruned {pruned} listings older than 2 weeks")
 
@@ -204,8 +223,12 @@ def run() -> None:
         set_state(conn, "initialised", "true")
         log.info(f"First run: found {len(all_listings)} existing listings")
         if NTFY_TOPIC:
-            _notify_safe(send_ntfy, NTFY_TOPIC, "Flat Finder initialised",
-                         f"Found {len(all_listings)} existing listings across {len(zones)} zones.")
+            _notify_safe(
+                send_ntfy,
+                NTFY_TOPIC,
+                "Flat Finder initialised",
+                f"Found {len(all_listings)} existing listings across {len(zones)} zones.",
+            )
     elif new_listings:
         log.info(f"Found {len(new_listings)} new listings")
         if NTFY_TOPIC:
@@ -214,13 +237,18 @@ def run() -> None:
             _notify_safe(send_ntfy, NTFY_TOPIC, title, body, click_url=click_url)
         if GMAIL_ADDRESS and GMAIL_APP_PASSWORD:
             html = format_email_html(new_listings)
-            _notify_safe(send_email, GMAIL_ADDRESS, GMAIL_APP_PASSWORD,
-                         f"Flat Finder: {len(new_listings)} new listing{'s' if len(new_listings) != 1 else ''}",
-                         html)
+            _notify_safe(
+                send_email,
+                GMAIL_ADDRESS,
+                GMAIL_APP_PASSWORD,
+                f"Flat Finder: {len(new_listings)} new listing{'s' if len(new_listings) != 1 else ''}",
+                html,
+            )
     else:
         log.info("No new listings found")
 
     conn.close()
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")

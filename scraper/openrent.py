@@ -1,8 +1,8 @@
 import re
-import requests
-from datetime import datetime, timezone
-from urllib.parse import urlencode, quote_plus
+from datetime import UTC, datetime
+from urllib.parse import quote_plus, urlencode
 
+import requests
 from bs4 import BeautifulSoup
 
 from scraper.rightmove import _check_description
@@ -11,8 +11,7 @@ BASE_URL = "https://www.openrent.co.uk/properties-to-rent"
 EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
 
 
-def build_search_url(location: str, radius_km: int, min_beds: int,
-                     max_beds: int, max_price: int) -> str:
+def build_search_url(location: str, radius_km: int, min_beds: int, max_beds: int, max_price: int) -> str:
     """Build an OpenRent search URL from parameters."""
     params = {
         "term": location,
@@ -183,7 +182,7 @@ def parse_openrent_html(html: str) -> list[dict]:
             "property_type": _extract_property_type(title),
             "furnishing": _extract_furnishing(card),
             "sqft": None,  # Not available on search page
-            "first_seen": datetime.now(timezone.utc).isoformat(),
+            "first_seen": datetime.now(UTC).isoformat(),
             "listing_date": None,  # Not reliably available on search page
             **desc_flags,
         }
@@ -192,13 +191,12 @@ def parse_openrent_html(html: str) -> list[dict]:
     return listings
 
 
-def fetch_openrent(location: str, radius_km: int, min_beds: int,
-                   max_beds: int, max_price: int) -> list[dict]:
+def fetch_openrent(location: str, radius_km: int, min_beds: int, max_beds: int, max_price: int) -> list[dict]:
     """Fetch and parse OpenRent search results."""
     url = build_search_url(location, radius_km, min_beds, max_beds, max_price)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     }
     resp = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
@@ -207,7 +205,8 @@ def fetch_openrent(location: str, radius_km: int, min_beds: int,
     # OpenRent doesn't always enforce server-side filters after redirect,
     # so enforce price and bedroom limits client-side
     return [
-        l for l in listings
+        l
+        for l in listings
         if (l.get("price_pcm") is None or l["price_pcm"] <= max_price)
         and (l.get("bedrooms") is None or min_beds <= l["bedrooms"] <= max_beds)
     ]

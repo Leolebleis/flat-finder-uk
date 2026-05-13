@@ -1,15 +1,18 @@
 import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from shared.zones import compute_zone_params, resolve_rightmove_id, resolve_postcode, point_in_zone, generate_circle_polygon
+from shared.zones import (
+    compute_zone_params,
+    generate_circle_polygon,
+    point_in_zone,
+    resolve_postcode,
+    resolve_rightmove_id,
+)
 
 SQUARE_POLYGON = {
     "type": "Polygon",
-    "coordinates": [[
-        [-0.19, 51.54], [-0.17, 51.54],
-        [-0.17, 51.56], [-0.19, 51.56],
-        [-0.19, 51.54]
-    ]]
+    "coordinates": [[[-0.19, 51.54], [-0.17, 51.54], [-0.17, 51.56], [-0.19, 51.56], [-0.19, 51.54]]],
 }
 
 
@@ -50,10 +53,7 @@ def test_generate_circle_polygon():
 def test_resolve_postcode(mock_get):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
-    mock_resp.json.return_value = {
-        "status": 200,
-        "result": [{"outcode": "NW6", "postcode": "NW6 1NB"}]
-    }
+    mock_resp.json.return_value = {"status": 200, "result": [{"outcode": "NW6", "postcode": "NW6 1NB"}]}
     mock_get.return_value = mock_resp
     result = resolve_postcode(51.545, -0.18)
     assert result == "NW6"
@@ -73,9 +73,7 @@ def test_resolve_postcode_returns_none_on_failure(mock_get):
 def test_resolve_rightmove_id(mock_get):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
-    mock_resp.json.return_value = {
-        "matches": [{"id": "1862", "type": "OUTCODE", "displayName": "NW6"}]
-    }
+    mock_resp.json.return_value = {"matches": [{"id": "1862", "type": "OUTCODE", "displayName": "NW6"}]}
     mock_get.return_value = mock_resp
     result = resolve_rightmove_id("NW6")
     assert result == "OUTCODE^1862"

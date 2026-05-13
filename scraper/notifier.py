@@ -81,7 +81,7 @@ def format_email_html(listings: list[dict]) -> str:
         if badges:
             spans = " ".join(
                 f'<span style="display:inline-block;background:#e8f5e9;'
-                f'color:#2e7d32;padding:2px 8px;border-radius:12px;'
+                f"color:#2e7d32;padding:2px 8px;border-radius:12px;"
                 f'font-size:12px;margin-right:4px;">{b}</span>'
                 for b in badges
             )
@@ -91,9 +91,9 @@ def format_email_html(listings: list[dict]) -> str:
             f'<div style="border:1px solid #ddd;border-radius:8px;padding:12px;margin-bottom:12px;">'
             f'<a href="{url}" style="font-size:16px;font-weight:bold;color:#1a73e8;text-decoration:none;">{title}</a>'
             f'<div style="font-size:18px;font-weight:bold;margin-top:4px;">{price_str}/month</div>'
-            f'{badge_html}'
+            f"{badge_html}"
             f'<div style="color:#666;margin-top:4px;">{address}</div>'
-            f'</div>'
+            f"</div>"
         )
 
     count = len(listings)
@@ -103,9 +103,9 @@ def format_email_html(listings: list[dict]) -> str:
     return (
         f'<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
         f'<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:16px;">'
-        f'<h2>{heading}</h2>'
-        f'{body_html}'
-        f'</body></html>'
+        f"<h2>{heading}</h2>"
+        f"{body_html}"
+        f"</body></html>"
     )
 
 

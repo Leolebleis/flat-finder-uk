@@ -1,9 +1,9 @@
 import json
-import sqlite3
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
-from shared.models import init_db, get_connection, get_zones
+
+from shared.models import get_connection, get_zones, init_db
 
 
 def _write_zones_json(path: Path, zones: list[dict]):

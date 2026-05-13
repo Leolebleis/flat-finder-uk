@@ -1,13 +1,21 @@
 # tests/test_ui.py
 import json
-import tempfile
 import os
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
-from fastapi.testclient import TestClient
-from shared.models import (init_db, get_connection, insert_listing, get_pois,
-                           insert_poi, upsert_poi_commute, get_zones, insert_zone)
 
+from fastapi.testclient import TestClient
+from shared.models import (
+    get_connection,
+    get_pois,
+    get_zones,
+    init_db,
+    insert_listing,
+    insert_poi,
+    insert_zone,
+    upsert_poi_commute,
+)
 
 USER_STATE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS user_state (
@@ -23,13 +31,26 @@ CREATE TABLE IF NOT EXISTS user_state (
 """
 
 SAMPLE_LISTING = {
-    "id": "rightmove_1", "source": "rightmove", "url": "https://example.com",
-    "title": "1 bed flat", "price_pcm": 1800, "bedrooms": 1,
-    "address": "NW6", "latitude": 51.54, "longitude": -0.17,
-    "description": "Nice flat", "image_url": None, "property_type": "flat",
-    "furnishing": "Furnished", "sqft": None, "has_dishwasher": "unknown",
-    "has_washer": "unknown", "has_outdoor": "unknown", "outdoor_type": None,
-    "first_seen": "2026-02-26T12:00:00+00:00", "listing_date": None,
+    "id": "rightmove_1",
+    "source": "rightmove",
+    "url": "https://example.com",
+    "title": "1 bed flat",
+    "price_pcm": 1800,
+    "bedrooms": 1,
+    "address": "NW6",
+    "latitude": 51.54,
+    "longitude": -0.17,
+    "description": "Nice flat",
+    "image_url": None,
+    "property_type": "flat",
+    "furnishing": "Furnished",
+    "sqft": None,
+    "has_dishwasher": "unknown",
+    "has_washer": "unknown",
+    "has_outdoor": "unknown",
+    "outdoor_type": None,
+    "first_seen": "2026-02-26T12:00:00+00:00",
+    "listing_date": None,
 }
 
 
@@ -37,9 +58,12 @@ def _make_app(db_path: Path):
     """Create a test client for the UI app with a temporary DB."""
     os.environ["FLAT_FINDER_UI_DB"] = str(db_path)
     import importlib
+
     import shared.config
+
     importlib.reload(shared.config)
     import ui.main
+
     importlib.reload(ui.main)
     return TestClient(ui.main.app)
 
@@ -64,6 +88,7 @@ def _seed_listing(db_path: Path, listing: dict | None = None, gym_commute_mins: 
 
 # --- POST /api/state/{id} tests ---
 
+
 def test_update_state_seen():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -80,9 +105,7 @@ def test_update_state_seen():
 
         # Verify persisted
         conn = get_connection(db_path)
-        row = conn.execute(
-            "SELECT * FROM user_state WHERE listing_id = ?", ("rightmove_1",)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM user_state WHERE listing_id = ?", ("rightmove_1",)).fetchone()
         conn.close()
         assert row is not None
         assert row["seen"] == 1
@@ -115,9 +138,7 @@ def test_update_state_notes():
 
         # Verify persisted
         conn = get_connection(db_path)
-        row = conn.execute(
-            "SELECT notes FROM user_state WHERE listing_id = ?", ("rightmove_1",)
-        ).fetchone()
+        row = conn.execute("SELECT notes FROM user_state WHERE listing_id = ?", ("rightmove_1",)).fetchone()
         conn.close()
         assert row["notes"] == "Nice area"
 
@@ -129,9 +150,7 @@ def test_update_state_multiple_fields():
         _seed_listing(db_path)
         client = _make_app(db_path)
 
-        resp = client.post("/api/state/rightmove_1", json={
-            "seen": True, "favourite": True, "notes": "Great flat"
-        })
+        resp = client.post("/api/state/rightmove_1", json={"seen": True, "favourite": True, "notes": "Great flat"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["seen"] is True
@@ -163,6 +182,7 @@ def test_update_state_nonexistent_listing():
 
 
 # --- GET /api/listings tests ---
+
 
 def test_api_listings_returns_json():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -209,6 +229,7 @@ def test_api_listings_includes_user_state():
 
 
 # --- Template route smoke tests ---
+
 
 def test_feed_page_returns_html():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -265,16 +286,26 @@ def test_feed_page_best_match_sort():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
         _setup_db(db_path)
-        _seed_listing(db_path, {
-            **SAMPLE_LISTING, "id": "close_gym",
-            "latitude": 51.544, "longitude": -0.176,
-            "commute_mins": 60,
-        })
-        _seed_listing(db_path, {
-            **SAMPLE_LISTING, "id": "short_commute",
-            "latitude": 51.49, "longitude": -0.18,
-            "commute_mins": 30,
-        })
+        _seed_listing(
+            db_path,
+            {
+                **SAMPLE_LISTING,
+                "id": "close_gym",
+                "latitude": 51.544,
+                "longitude": -0.176,
+                "commute_mins": 60,
+            },
+        )
+        _seed_listing(
+            db_path,
+            {
+                **SAMPLE_LISTING,
+                "id": "short_commute",
+                "latitude": 51.49,
+                "longitude": -0.18,
+                "commute_mins": 30,
+            },
+        )
         conn = get_connection(db_path)
         poi_id = insert_poi(conn, "Work", 51.4869, -0.1832, 0)
         upsert_poi_commute(conn, "close_gym", poi_id, 60)
@@ -310,6 +341,7 @@ def test_detail_page_404_for_missing():
 
 # --- Label override tests ---
 
+
 def test_update_state_override_dishwasher():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -325,8 +357,7 @@ def test_update_state_override_dishwasher():
         # Verify persisted
         conn = get_connection(db_path)
         row = conn.execute(
-            "SELECT override_dishwasher FROM user_state WHERE listing_id = ?",
-            ("rightmove_1",)
+            "SELECT override_dishwasher FROM user_state WHERE listing_id = ?", ("rightmove_1",)
         ).fetchone()
         conn.close()
         assert row["override_dishwasher"] == "yes"
@@ -363,6 +394,7 @@ def test_feed_page_applies_overrides():
 
 # --- Settings page tests ---
 
+
 def test_settings_page_returns_html():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         db_path = Path(f.name)
@@ -378,10 +410,11 @@ def test_add_poi_via_settings():
         db_path = Path(f.name)
         _setup_db(db_path)
         client = _make_app(db_path)
-        resp = client.post("/settings/poi", data={
-            "name": "Office",
-            "maps_url": "https://www.google.com/maps/@51.4869,-0.1832,17z/"
-        }, follow_redirects=False)
+        resp = client.post(
+            "/settings/poi",
+            data={"name": "Office", "maps_url": "https://www.google.com/maps/@51.4869,-0.1832,17z/"},
+            follow_redirects=False,
+        )
         assert resp.status_code == 303
         conn = get_connection(db_path)
         pois = get_pois(conn)
@@ -413,10 +446,7 @@ def test_add_poi_rejects_invalid_url():
         db_path = Path(f.name)
         _setup_db(db_path)
         client = _make_app(db_path)
-        resp = client.post("/settings/poi", data={
-            "name": "Bad",
-            "maps_url": "not a url"
-        }, follow_redirects=False)
+        resp = client.post("/settings/poi", data={"name": "Bad", "maps_url": "not a url"}, follow_redirects=False)
         assert resp.status_code == 303
         conn = get_connection(db_path)
         pois = get_pois(conn)
@@ -425,6 +455,7 @@ def test_add_poi_rejects_invalid_url():
 
 
 # --- Dynamic POI feed/detail tests ---
+
 
 def test_feed_page_with_pois_shows_dynamic_metrics():
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
@@ -459,7 +490,10 @@ def test_detail_page_with_pois_shows_dynamic_metrics():
 
 # --- Zone API tests ---
 
-SAMPLE_GEOMETRY = {"type":"Polygon","coordinates":[[[-0.19,51.54],[-0.17,51.54],[-0.17,51.55],[-0.19,51.55],[-0.19,51.54]]]}
+SAMPLE_GEOMETRY = {
+    "type": "Polygon",
+    "coordinates": [[[-0.19, 51.54], [-0.17, 51.54], [-0.17, 51.55], [-0.19, 51.55], [-0.19, 51.54]]],
+}
 
 
 def test_api_get_zones_empty():
@@ -477,12 +511,17 @@ def test_api_create_zone():
         db_path = Path(f.name)
         _setup_db(db_path)
         client = _make_app(db_path)
-        with patch("ui.main.resolve_postcode", return_value="NW6"), \
-             patch("ui.main.resolve_rightmove_id", return_value="OUTCODE^1862"):
-            resp = client.post("/api/zones", json={
-                "name": "Test Zone",
-                "geometry": SAMPLE_GEOMETRY,
-            })
+        with (
+            patch("ui.main.resolve_postcode", return_value="NW6"),
+            patch("ui.main.resolve_rightmove_id", return_value="OUTCODE^1862"),
+        ):
+            resp = client.post(
+                "/api/zones",
+                json={
+                    "name": "Test Zone",
+                    "geometry": SAMPLE_GEOMETRY,
+                },
+            )
         assert resp.status_code == 200
         data = resp.json()
         assert data["name"] == "Test Zone"
@@ -499,12 +538,17 @@ def test_api_delete_zone():
         db_path = Path(f.name)
         _setup_db(db_path)
         conn = get_connection(db_path)
-        zone_id = insert_zone(conn, "Test", json.dumps(SAMPLE_GEOMETRY),
-                              centroid_lat=51.545, centroid_lng=-0.18,
-                              covering_radius_km=1.2,
-                              rightmove_id="OUTCODE^1862",
-                              openrent_term="NW6",
-                              color_index=0)
+        zone_id = insert_zone(
+            conn,
+            "Test",
+            json.dumps(SAMPLE_GEOMETRY),
+            centroid_lat=51.545,
+            centroid_lng=-0.18,
+            covering_radius_km=1.2,
+            rightmove_id="OUTCODE^1862",
+            openrent_term="NW6",
+            color_index=0,
+        )
         conn.close()
         client = _make_app(db_path)
         resp = client.delete(f"/api/zones/{zone_id}")
@@ -520,19 +564,29 @@ def test_api_update_zone():
         db_path = Path(f.name)
         _setup_db(db_path)
         conn = get_connection(db_path)
-        zone_id = insert_zone(conn, "Old", json.dumps(SAMPLE_GEOMETRY),
-                              centroid_lat=51.545, centroid_lng=-0.18,
-                              covering_radius_km=1.2,
-                              rightmove_id="OUTCODE^1862",
-                              openrent_term="NW6",
-                              color_index=0)
+        zone_id = insert_zone(
+            conn,
+            "Old",
+            json.dumps(SAMPLE_GEOMETRY),
+            centroid_lat=51.545,
+            centroid_lng=-0.18,
+            covering_radius_km=1.2,
+            rightmove_id="OUTCODE^1862",
+            openrent_term="NW6",
+            color_index=0,
+        )
         conn.close()
         client = _make_app(db_path)
-        with patch("ui.main.resolve_postcode", return_value="NW6"), \
-             patch("ui.main.resolve_rightmove_id", return_value="OUTCODE^1862"):
-            resp = client.put(f"/api/zones/{zone_id}", json={
-                "name": "Updated",
-                "geometry": SAMPLE_GEOMETRY,
-            })
+        with (
+            patch("ui.main.resolve_postcode", return_value="NW6"),
+            patch("ui.main.resolve_rightmove_id", return_value="OUTCODE^1862"),
+        ):
+            resp = client.put(
+                f"/api/zones/{zone_id}",
+                json={
+                    "name": "Updated",
+                    "geometry": SAMPLE_GEOMETRY,
+                },
+            )
         assert resp.status_code == 200
         assert resp.json()["name"] == "Updated"

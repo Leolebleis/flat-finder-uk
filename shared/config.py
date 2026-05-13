@@ -1,8 +1,10 @@
 import os
 from pathlib import Path
 
+
 def get_env(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
+
 
 # Paths
 DB_PATH = Path(get_env("FLAT_FINDER_DB", "/app/data/flat_finder.db"))

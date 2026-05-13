@@ -1,10 +1,11 @@
 """Zone geometry utilities: centroid, covering radius, point-in-polygon, external lookups."""
+
 import json
 import logging
 import math
 
 import requests
-from shapely.geometry import shape, Point
+from shapely.geometry import Point, shape
 
 log = logging.getLogger("flat-finder")
 
@@ -17,16 +18,17 @@ def compute_zone_params(geometry: dict) -> dict:
     """
     geom = shape(geometry)
     if geom.geom_type != "Polygon":
-        raise ValueError(f"Expected Polygon, got {geom.geom_type}")
+        msg = f"Expected Polygon, got {geom.geom_type}"
+        raise ValueError(msg)
     if not geom.is_valid:
-        raise ValueError("Invalid polygon geometry")
+        msg = "Invalid polygon geometry"
+        raise ValueError(msg)
     centroid = geom.centroid
     # Covering radius: max distance from centroid to any vertex, in km
     max_dist_deg = 0.0
     for coord in geom.exterior.coords:
         d = math.sqrt((coord[0] - centroid.x) ** 2 + (coord[1] - centroid.y) ** 2)
-        if d > max_dist_deg:
-            max_dist_deg = d
+        max_dist_deg = max(max_dist_deg, d)
     # Convert degrees to km (approximate, latitude-dependent)
     lat_rad = math.radians(centroid.y)
     km_per_deg_lat = 111.32
