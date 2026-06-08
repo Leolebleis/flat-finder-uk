@@ -11,6 +11,9 @@ dependencies = [
     "requests>=2.31",
     "shapely>=2.0",
     "beautifulsoup4>=4.12",
+    "sqlalchemy>=2.0",
+    "alembic>=1.15",
+    "itsdangerous>=2.2",
 ]
 
 [dependency-groups]
@@ -26,6 +29,7 @@ dev = [
     "ty>=0.0.20",
     "asgi-lifespan>=2.1",
     "httpx>=0.28",
+    "import-linter>=2.11",
 ]
 
 [tool.ruff]
