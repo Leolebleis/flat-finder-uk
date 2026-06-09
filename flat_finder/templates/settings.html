@@ -13,16 +13,37 @@
     <h1 class="settings__title">Notifications</h1>
     <p class="settings__desc">Receive alerts when new listings are found matching your zones.</p>
 
-    <form class="settings__form" method="post" action="{{ request.url_for('update_ntfy') }}">
-        <div class="settings__field settings__field--wide">
-            <label for="ntfy_topic">ntfy topic</label>
-            <input type="text" id="ntfy_topic" name="topic"
-                   value="{{ ntfy_topic or '' }}"
-                   placeholder="my-flat-alerts">
-            <small class="form-hint">Notifications sent to https://ntfy.sh/your-topic</small>
+    <div class="settings__ntfy" id="ntfy-section">
+        {% if ntfy_topic %}
+        <div class="settings__ntfy-display" id="ntfy-display">
+            <div class="settings__ntfy-current">
+                <span class="settings__ntfy-label">ntfy topic</span>
+                <span class="settings__ntfy-value">{{ ntfy_topic }}</span>
+                <small class="form-hint">Notifications sent to https://ntfy.sh/{{ ntfy_topic }}</small>
+            </div>
+            <button type="button" class="btn-action" id="ntfy-edit-btn">Edit</button>
         </div>
-        <button type="submit" class="btn-action btn-action--primary">Save</button>
-    </form>
+        {% endif %}
+        <form class="settings__form" id="ntfy-form" method="post" action="{{ request.url_for('update_ntfy') }}"
+              {% if ntfy_topic %}style="display:none"{% endif %}>
+            <div class="settings__field settings__field--wide">
+                <label for="ntfy_topic">ntfy topic</label>
+                <input type="text" id="ntfy_topic" name="topic"
+                       value="{{ ntfy_topic or '' }}"
+                       placeholder="my-flat-alerts">
+                <small class="form-hint">Notifications sent to https://ntfy.sh/your-topic</small>
+            </div>
+            <div class="settings__ntfy-actions">
+                <button type="submit" class="btn-action btn-action--primary">Save</button>
+                {% if ntfy_topic %}
+                <button type="button" class="btn-action" id="ntfy-cancel-btn">Cancel</button>
+                {% endif %}
+            </div>
+        </form>
+        {% if not ntfy_topic %}
+        <p class="settings__empty">No notification topic set. Add one to receive alerts for new listings.</p>
+        {% endif %}
+    </div>
 
     <h1 class="settings__title">Places of Interest</h1>
     <p class="settings__desc">Add locations to track commute times from each listing. Paste a Google Maps link to set the coordinates.</p>
@@ -104,6 +125,26 @@
 <script>
 (function() {
     "use strict";
+
+    // --- ntfy edit toggle ---
+    var ntfyDisplay = document.getElementById("ntfy-display");
+    var ntfyForm = document.getElementById("ntfy-form");
+    var ntfyEditBtn = document.getElementById("ntfy-edit-btn");
+    var ntfyCancelBtn = document.getElementById("ntfy-cancel-btn");
+
+    if (ntfyEditBtn) {
+        ntfyEditBtn.addEventListener("click", function() {
+            ntfyDisplay.style.display = "none";
+            ntfyForm.style.display = "";
+            document.getElementById("ntfy_topic").focus();
+        });
+    }
+    if (ntfyCancelBtn) {
+        ntfyCancelBtn.addEventListener("click", function() {
+            ntfyForm.style.display = "none";
+            ntfyDisplay.style.display = "";
+        });
+    }
 
     var zoneMap = null;
     var drawnLayer = null;
