@@ -25,8 +25,7 @@ class UserService:
         return self._dao.get_by_id(user_id)
 
     def update_ntfy_topic(self, user_id: int, topic: str | None) -> None:
-        clean = topic.strip() if topic else None
-        clean = clean or None
+        clean = (topic or "").strip() or None
         self._dao.update_ntfy_topic(user_id, clean)
         log.info("Updated ntfy topic for user %d", user_id)
 

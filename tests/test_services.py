@@ -614,7 +614,7 @@ class TestZoneServiceOwnership:
     def test_update_own_zone_succeeds(self, db_session):
         """Given a zone owned by user A
         When user A updates its name
-        Then update_zone returns True.
+        Then update_zone returns the updated zone dict.
         """
         zone_repo = ZoneRepository(db_session)
         zone = zone_repo.create(
@@ -632,12 +632,13 @@ class TestZoneServiceOwnership:
 
         updated = svc.update_zone(user_id=1, zone_id=zone.id, name="New Name")
 
-        assert updated is True
+        assert updated is not None
+        assert updated["name"] == "New Name"
 
     def test_update_other_users_zone_fails(self, db_session):
         """Given a zone owned by user A
         When user B attempts to update it
-        Then update_zone returns False.
+        Then update_zone returns None.
         """
         zone_repo = ZoneRepository(db_session)
         zone = zone_repo.create(
@@ -655,7 +656,7 @@ class TestZoneServiceOwnership:
 
         updated = svc.update_zone(user_id=2, zone_id=zone.id, name="Stolen Name")
 
-        assert updated is False
+        assert updated is None
 
     def test_create_zone_auto_assigns_color(self, db_session):
         """Given a user with no existing zones

@@ -5,9 +5,9 @@ from typing import Any
 from sqlalchemy import Integer, Text
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from flat_finder.database import Base
+from flat_finder.database import Base, delete_by_listing_ids
 from flat_finder.listings.persistence import ListingDB
-from flat_finder.pois.model import POI, POICommute
+from flat_finder.pois.model import POI
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +39,10 @@ class POIRepository:
     def get_by_user(self, user_id: int) -> list[POI]:
         rows = self._session.query(POIDB).filter_by(user_id=user_id).all()
         return [self._to_domain(r) for r in rows]
+
+    def get_by_id(self, poi_id: int) -> POI | None:
+        row = self._session.get(POIDB, poi_id)
+        return self._to_domain(row) if row else None
 
     def get_all(self) -> list[POI]:
         rows = self._session.query(POIDB).all()
@@ -106,7 +110,7 @@ class POICommuteRepository:
         """Return listings with lat/lng that do not yet have a commute for poi_id."""
         existing_ids = self._session.query(POICommuteDB.listing_id).filter_by(poi_id=poi_id).scalar_subquery()
         rows = (
-            self._session.query(ListingDB)
+            self._session.query(ListingDB.id, ListingDB.latitude, ListingDB.longitude)
             .filter(
                 ListingDB.latitude.isnot(None),
                 ListingDB.longitude.isnot(None),
@@ -117,16 +121,4 @@ class POICommuteRepository:
         return [{"id": r.id, "latitude": r.latitude, "longitude": r.longitude} for r in rows]
 
     def delete_for_listings(self, listing_ids: list[str]) -> None:
-        if listing_ids:
-            self._session.query(POICommuteDB).filter(POICommuteDB.listing_id.in_(listing_ids)).delete(
-                synchronize_session="fetch"
-            )
-            self._session.flush()
-
-    @staticmethod
-    def _to_domain(row: POICommuteDB) -> POICommute:
-        return POICommute(
-            listing_id=row.listing_id,
-            poi_id=row.poi_id,
-            commute_mins=row.commute_mins,
-        )
+        delete_by_listing_ids(self._session, POICommuteDB, listing_ids)

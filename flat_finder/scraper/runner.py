@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-import time
 from collections.abc import Callable
 from typing import Any
 
@@ -10,11 +9,10 @@ from shapely.prepared import prep
 from sqlalchemy.orm import Session
 
 from flat_finder import config
-from flat_finder.database import Base, get_engine, get_session
+from flat_finder.database import get_engine, get_session
 from flat_finder.listings.persistence import ListingRepository, ListingStateRepository, ScraperStateDB
-from flat_finder.pois.model import POI
 from flat_finder.pois.persistence import POICommuteRepository, POIRepository
-from flat_finder.scraper.commute import tfl_journey_mins
+from flat_finder.scraper.commute import fetch_commutes_for_listings
 from flat_finder.scraper.notifier import (
     format_email_html,
     format_failure_message,
@@ -32,7 +30,6 @@ log = logging.getLogger("flat-finder")
 
 KM_PER_MILE = 1.60934
 DEFAULT_ZONE_RADIUS_KM = 1.6
-TFL_RATE_LIMIT_SLEEP_S = 0.5
 PRUNE_AFTER_DAYS = 14
 
 
@@ -93,21 +90,6 @@ def _filter_listings_by_zone(listings: list[dict[str, Any]], zone_geometry: str 
     ]
 
 
-def _fetch_commute_for_listings(
-    poi_commute_repo: POICommuteRepository,
-    poi: POI,
-    rows: list[dict[str, Any]],
-) -> None:
-    """Fetch TfL commutes for the given listings and upsert results. Throttled."""
-    for row in rows:
-        mins = tfl_journey_mins(row["latitude"], row["longitude"], poi.lat, poi.lng)
-        if mins is None:
-            # TfL failure — no commute fetched, skip the rate-limit sleep
-            continue
-        poi_commute_repo.upsert(row["id"], poi.id, mins)
-        time.sleep(TFL_RATE_LIMIT_SLEEP_S)
-
-
 def _get_scraper_state(session: Session, key: str) -> str | None:
     row = session.get(ScraperStateDB, key)
     return row.value if row else None
@@ -152,7 +134,6 @@ def _handle_failure_state(
 
 def run() -> None:  # noqa: C901, PLR0912, PLR0915
     engine = get_engine(config.DB_PATH)
-    Base.metadata.create_all(engine)
     Session = get_session(engine)  # noqa: N806
     session = Session()
     try:
@@ -166,17 +147,9 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
 
         first_run = _get_scraper_state(session, "initialised") is None
 
-        # Get all zones across all users; deduplicate by (rightmove_id, openrent_term)
         all_zones = zone_repo.get_all()
-        seen_zone_keys: set[tuple[str | None, str | None]] = set()
-        unique_zones = []
-        for zone in all_zones:
-            key = (zone.rightmove_id, zone.openrent_term)
-            if key not in seen_zone_keys:
-                seen_zone_keys.add(key)
-                unique_zones.append(zone)
 
-        # Scrape per unique zone, dedup listings globally
+        # Scrape per zone, dedup listings globally
         # Map listing_id -> list of zone IDs that found it
         listing_zone_map: dict[str, list[int]] = {}
         all_listings: list[dict[str, Any]] = []
@@ -194,11 +167,8 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         log.info("Search params (widest): rent=%d, beds=%d-%d", search_max_rent, search_min_beds, search_max_beds)
 
         # Use first user's ntfy_topic for failure/recovery notifications (global scraper health)
-        users_with_ntfy = [u for u in all_users if u.ntfy_topic]
+        users_with_ntfy = user_repo.get_all_with_ntfy()
         health_ntfy_topic = users_with_ntfy[0].ntfy_topic if users_with_ntfy else None
-
-        # Track which zone each listing came from (before dedup)
-        zone_listings_map: dict[int, list[dict[str, Any]]] = {}
 
         for zone in all_zones:
             radius_km = zone.covering_radius_km or DEFAULT_ZONE_RADIUS_KM
@@ -224,7 +194,6 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             # Post-filter by polygon
             combined = _filter_listings_by_zone(rm_listings + or_listings, zone.geometry)
 
-            zone_listings_map[zone.id] = []
             for listing in combined:
                 # Track that this zone found this listing (before global dedup)
                 if listing["id"] not in listing_zone_map:
@@ -264,14 +233,14 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
                 if listing.get("latitude") and listing.get("longitude")
             ]
             for poi in pois:
-                _fetch_commute_for_listings(poi_commute_repo, poi, rows)
+                fetch_commutes_for_listings(poi_commute_repo, poi, rows)
 
         # Backfill: any listings still missing commute data for any POI
         for poi in pois:
             missing = poi_commute_repo.get_listings_missing_poi(poi.id)
             if missing:
                 log.info("Backfilling '%s' commute for %d listings", poi.name, len(missing))
-                _fetch_commute_for_listings(poi_commute_repo, poi, missing)
+                fetch_commutes_for_listings(poi_commute_repo, poi, missing)
 
         # Attach poi_commutes to new listings for notification (one batched query)
         if new_listings:

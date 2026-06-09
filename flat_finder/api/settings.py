@@ -1,6 +1,5 @@
 import logging
 import threading
-import time
 from collections.abc import Callable
 from typing import Annotated
 
@@ -15,37 +14,28 @@ from flat_finder.api.dependencies import (
     get_zone_service,
 )
 from flat_finder.api.templating import templates
+from flat_finder.colors import POI_COLORS
 from flat_finder.geo import extract_coords_from_url
-from flat_finder.pois.persistence import POICommuteRepository
+from flat_finder.pois.persistence import POICommuteRepository, POIRepository
 from flat_finder.pois.service import POIService
-from flat_finder.scraper.commute import tfl_journey_mins
+from flat_finder.scraper.commute import fetch_commutes_for_listings
 from flat_finder.users.service import UserService
-from flat_finder.zones.service import POI_COLORS, ZoneService
+from flat_finder.zones.service import ZoneService
 
 log = logging.getLogger(__name__)
 router = APIRouter()
 
-_TFL_BACKFILL_SLEEP_S = 0.5
 
-
-def _backfill_poi(
-    poi_id: int,
-    poi_lat: float,
-    poi_lng: float,
-    session_factory: Callable[[], Session],
-) -> None:
+def _backfill_poi(poi_id: int, session_factory: Callable[[], Session]) -> None:
     """Background thread: fetch TfL commute times for all listings missing this POI."""
     session = session_factory()
     try:
+        poi = POIRepository(session).get_by_id(poi_id)
+        if poi is None:
+            return
         commute_repo = POICommuteRepository(session)
         rows = commute_repo.get_listings_missing_poi(poi_id)
-        for row in rows:
-            mins = tfl_journey_mins(row["latitude"], row["longitude"], poi_lat, poi_lng)
-            if mins is None:
-                continue
-            commute_repo.upsert(row["id"], poi_id, mins)
-            session.commit()
-            time.sleep(_TFL_BACKFILL_SLEEP_S)
+        fetch_commutes_for_listings(commute_repo, poi, rows, after_upsert=session.commit)
     finally:
         session.close()
 
@@ -89,10 +79,9 @@ def add_poi(
         return RedirectResponse(request.url_for("settings_page"), status_code=303)
     lat, lng = coords
     poi = poi_service.add_poi(user_id, name.strip(), lat, lng)
-    session_factory = request.app.state.session_factory
     threading.Thread(
         target=_backfill_poi,
-        args=(poi["id"], lat, lng, session_factory),
+        args=(poi["id"], request.app.state.session_factory),
         daemon=True,
     ).start()
     return RedirectResponse(request.url_for("settings_page"), status_code=303)
@@ -126,7 +115,7 @@ def _parse_int_or_none(value: str) -> int | None:
 
 
 @router.post("/settings/search", name="update_search_params")
-def update_search_params(
+def update_search_params(  # noqa: PLR0913
     request: Request,
     user_id: Annotated[int, Depends(get_current_user_id)],
     user_service: Annotated[UserService, Depends(get_user_service)],

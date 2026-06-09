@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Integer, String, Text
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
+from flat_finder import config
 from flat_finder.database import Base
 from flat_finder.users.model import User
 
@@ -31,7 +32,7 @@ class UserRepository:
         db_user = UserDB(
             username=username,
             ntfy_topic=f"flat-finder-{secrets.token_hex(4)}",
-            max_rent_pcm=2200,
+            max_rent_pcm=config.MAX_RENT_PCM,
             created_at=datetime.now(UTC).isoformat(),
         )
         self._session.add(db_user)

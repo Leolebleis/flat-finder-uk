@@ -3,10 +3,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-import flat_finder.listings.persistence
-import flat_finder.pois.persistence
-import flat_finder.users.persistence
-import flat_finder.zones.persistence  # noqa: F401
+import flat_finder.persistence  # noqa: F401
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

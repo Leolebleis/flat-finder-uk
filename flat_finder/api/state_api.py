@@ -19,8 +19,7 @@ def update_state(
     listing_service: Annotated[ListingService, Depends(get_listing_service)],
 ) -> dict[str, Any]:
     # Verify listing exists before upserting state
-    detail = listing_service.get_detail_data(user_id, listing_id, [])
-    if detail is None:
+    if not listing_service.exists(listing_id):
         raise HTTPException(status_code=404, detail="Listing not found")
 
     updates = body.model_dump(include=body.model_fields_set)

@@ -10,10 +10,3 @@ class POI:
     lng: float
     color_index: int
     created_at: str
-
-
-@dataclass(frozen=True)
-class POICommute:
-    listing_id: str
-    poi_id: int
-    commute_mins: int

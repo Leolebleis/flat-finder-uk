@@ -207,7 +207,8 @@ def _upgrade_existing_db() -> None:
 
     # 4. Recreate user_state with composite PK (user_id, listing_id)
     #    Old PK was just listing_id. Batch mode handles the CREATE-COPY-DROP-RENAME.
-    conn.execute(sa.text("""
+    conn.execute(
+        sa.text("""
         CREATE TABLE user_state_new (
             user_id INTEGER NOT NULL,
             listing_id TEXT NOT NULL,
@@ -220,24 +221,30 @@ def _upgrade_existing_db() -> None:
             updated_at DATETIME,
             PRIMARY KEY (user_id, listing_id)
         )
-    """))
-    conn.execute(sa.text("""
+    """)
+    )
+    conn.execute(
+        sa.text("""
         INSERT INTO user_state_new (user_id, listing_id, seen, favourite, notes,
             override_dishwasher, override_washer, override_outdoor, updated_at)
         SELECT :uid, listing_id, COALESCE(seen, 0), COALESCE(favourite, 0), notes,
             override_dishwasher, override_washer, override_outdoor, updated_at
         FROM user_state
-    """), {"uid": leo_id})
+    """),
+        {"uid": leo_id},
+    )
     conn.execute(sa.text("DROP TABLE user_state"))
     conn.execute(sa.text("ALTER TABLE user_state_new RENAME TO user_state"))
 
     # 5. Backfill listing_zones from the zone column on listings
-    conn.execute(sa.text("""
+    conn.execute(
+        sa.text("""
         INSERT OR IGNORE INTO listing_zones (listing_id, zone_id)
         SELECT l.id, z.id
         FROM listings l JOIN zones z ON l.zone = z.name
         WHERE l.zone IS NOT NULL
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:

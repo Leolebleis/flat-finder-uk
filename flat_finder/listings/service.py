@@ -1,4 +1,5 @@
 import logging
+from dataclasses import asdict
 from typing import Any
 
 from flat_finder.listings.dao import ListingDAO, ListingStateDAO
@@ -113,7 +114,6 @@ class ListingService:
         zone_ids: list[int],
         pois: list[dict[str, Any]],
         sort: str = "newest",
-        zone_filter: str = "all",  # noqa: ARG002 — reserved for future zone-name filter
     ) -> dict[str, Any]:
         """Build feed page context. Returns dict with listings, sort, zones, pois."""
         if sort not in SORT_OPTIONS:
@@ -150,35 +150,15 @@ class ListingService:
 
         state = self._state_dao.get(user_id, listing_id)
 
-        listing: dict[str, Any] = {
-            "id": listing_obj.id,
-            "source": listing_obj.source,
-            "url": listing_obj.url,
-            "title": listing_obj.title,
-            "price_pcm": listing_obj.price_pcm,
-            "bedrooms": listing_obj.bedrooms,
-            "address": listing_obj.address,
-            "latitude": listing_obj.latitude,
-            "longitude": listing_obj.longitude,
-            "description": listing_obj.description,
-            "image_url": listing_obj.image_url,
-            "property_type": listing_obj.property_type,
-            "furnishing": listing_obj.furnishing,
-            "sqft": listing_obj.sqft,
-            "has_dishwasher": listing_obj.has_dishwasher,
-            "has_washer": listing_obj.has_washer,
-            "has_outdoor": listing_obj.has_outdoor,
-            "outdoor_type": listing_obj.outdoor_type,
-            "zone": listing_obj.zone,
-            "first_seen": listing_obj.first_seen,
-            "listing_date": listing_obj.listing_date,
-            "seen": bool(state.seen) if state else False,
-            "favourite": bool(state.favourite) if state else False,
-            "notes": state.notes if state else None,
-            "override_dishwasher": state.override_dishwasher if state else None,
-            "override_washer": state.override_washer if state else None,
-            "override_outdoor": state.override_outdoor if state else None,
-        }
+        listing: dict[str, Any] = asdict(listing_obj)
+        listing.update(
+            seen=bool(state.seen) if state else False,
+            favourite=bool(state.favourite) if state else False,
+            notes=state.notes if state else None,
+            override_dishwasher=state.override_dishwasher if state else None,
+            override_washer=state.override_washer if state else None,
+            override_outdoor=state.override_outdoor if state else None,
+        )
 
         # Stash originals before applying overrides — detail page surfaces both
         listing["original_dishwasher"] = listing["has_dishwasher"]
@@ -191,6 +171,10 @@ class ListingService:
 
         return {"listing": listing, "pois": pois}
 
+    def exists(self, listing_id: str) -> bool:
+        """Check whether a listing exists."""
+        return self._listing_dao.get_by_id(listing_id) is not None
+
     def update_state(
         self,
         user_id: int,
@@ -198,15 +182,4 @@ class ListingService:
         updates: dict[str, Any],
     ) -> dict[str, Any]:
         """Upsert user state for a listing. Returns the updated state as a dict."""
-        state = self._state_dao.upsert(user_id, listing_id, updates)
-        return {
-            "user_id": state.user_id,
-            "listing_id": state.listing_id,
-            "seen": state.seen,
-            "favourite": state.favourite,
-            "notes": state.notes,
-            "override_dishwasher": state.override_dishwasher,
-            "override_washer": state.override_washer,
-            "override_outdoor": state.override_outdoor,
-            "updated_at": state.updated_at,
-        }
+        return asdict(self._state_dao.upsert(user_id, listing_id, updates))

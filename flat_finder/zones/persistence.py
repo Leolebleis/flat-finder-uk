@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Integer, Text, exc
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from flat_finder.database import Base
+from flat_finder.database import Base, delete_by_listing_ids
 from flat_finder.zones.model import Zone
 
 log = logging.getLogger(__name__)
@@ -133,8 +133,4 @@ class ListingZoneRepository:
         return list({r.listing_id for r in rows})
 
     def delete_for_listings(self, listing_ids: list[str]) -> None:
-        if listing_ids:
-            self._session.query(ListingZoneDB).filter(ListingZoneDB.listing_id.in_(listing_ids)).delete(
-                synchronize_session="fetch"
-            )
-            self._session.flush()
+        delete_by_listing_ids(self._session, ListingZoneDB, listing_ids)

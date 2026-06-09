@@ -442,21 +442,6 @@ class TestListingRepository:
 
         assert results == []
 
-    def test_get_listings_in_zone_polygon_returns_only_geolocated(self, db_session):
-        """Given listings with and without coordinates
-        When I call get_listings_in_zone_polygon
-        Then only listings with lat/lng are returned.
-        """
-        repo = ListingRepository(db_session)
-        repo.insert(_make_listing_dict("rm_110", lat=51.5, lng=-0.1))
-        repo.insert(_make_listing_dict("rm_111", lat=None, lng=None))
-
-        results = repo.get_listings_in_zone_polygon("{}")
-
-        ids = [r.id for r in results]
-        assert "rm_110" in ids
-        assert "rm_111" not in ids
-
 
 # ---------------------------------------------------------------------------
 # TestListingStateRepository

@@ -1,4 +1,4 @@
-"""Tests for the new flat_finder scraper (runner.py).
+"""Tests for the flat_finder scraper (runner.py).
 
 All external HTTP calls (Rightmove, OpenRent, TfL, ntfy) are mocked.
 Uses a real SQLite DB via the conftest db_session fixture.
@@ -119,12 +119,11 @@ def _scraper_run_mocked(
     with (
         patch("flat_finder.scraper.runner.fetch_rightmove", return_value=rm_listings),
         patch("flat_finder.scraper.runner.fetch_openrent", return_value=or_listings),
-        patch("flat_finder.scraper.runner.tfl_journey_mins", return_value=tfl_mins),
+        patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=tfl_mins),
         patch("flat_finder.scraper.runner.send_ntfy") as mock_ntfy,
         patch("flat_finder.scraper.runner.send_email"),
         patch("flat_finder.scraper.runner.get_engine") as mock_engine,
         patch("flat_finder.scraper.runner.get_session") as mock_get_session,
-        patch("flat_finder.database.Base.metadata.create_all"),
     ):
         mock_engine.return_value = db_session.bind
         mock_get_session.return_value = _make_session_factory(db_session)
@@ -253,12 +252,11 @@ class TestListingZonesPopulation:
         with (
             patch("flat_finder.scraper.runner.fetch_rightmove", return_value=[listing]),
             patch("flat_finder.scraper.runner.fetch_openrent", return_value=[]),
-            patch("flat_finder.scraper.runner.tfl_journey_mins", return_value=None),
+            patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=None),
             patch("flat_finder.scraper.runner.send_ntfy"),
             patch("flat_finder.scraper.runner.send_email"),
             patch("flat_finder.scraper.runner.get_engine") as mock_engine,
             patch("flat_finder.scraper.runner.get_session") as mock_get_session,
-            patch("flat_finder.database.Base.metadata.create_all"),
         ):
             mock_engine.return_value = db_session.bind
             mock_get_session.return_value = _make_session_factory(db_session)
@@ -370,12 +368,11 @@ class TestPerUserNotifications:
         with (
             patch("flat_finder.scraper.runner.fetch_rightmove", side_effect=mock_fetch_rm),
             patch("flat_finder.scraper.runner.fetch_openrent", return_value=[]),
-            patch("flat_finder.scraper.runner.tfl_journey_mins", return_value=None),
+            patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=None),
             patch("flat_finder.scraper.runner.send_ntfy") as mock_ntfy,
             patch("flat_finder.scraper.runner.send_email"),
             patch("flat_finder.scraper.runner.get_engine") as mock_engine,
             patch("flat_finder.scraper.runner.get_session") as mock_get_session,
-            patch("flat_finder.database.Base.metadata.create_all"),
         ):
             mock_engine.return_value = db_session.bind
             mock_get_session.return_value = _make_session_factory(db_session)

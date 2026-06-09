@@ -1,7 +1,6 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -15,19 +14,18 @@ from flat_finder.api.listings_api import router as listings_api_router
 from flat_finder.api.map_page import router as map_router
 from flat_finder.api.settings import router as settings_router
 from flat_finder.api.state_api import router as state_api_router
+from flat_finder.api.templating import PKG_DIR
 from flat_finder.api.zones_api import router as zones_api_router
-from flat_finder.database import Base, get_engine, get_session
+from flat_finder.database import get_engine, get_session
 from flat_finder.users.auth import AuthMiddleware
 
 log = logging.getLogger(__name__)
 
-_pkg_dir = Path(__file__).resolve().parent.parent
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Schema is owned by Alembic — `alembic upgrade head` runs before startup
     engine = get_engine(config.DB_PATH)
-    Base.metadata.create_all(engine)  # For now; will be replaced by alembic upgrade
     app.state.engine = engine
     app.state.session_factory = get_session(engine)
     log.info("Application started, DB at %s", config.DB_PATH)
@@ -45,7 +43,7 @@ def create_app() -> FastAPI:
     app.add_middleware(SessionMiddleware, secret_key=config.SECRET_KEY)
 
     # Mount static files
-    static_dir = _pkg_dir / "static"
+    static_dir = PKG_DIR / "static"
     if not static_dir.exists():
         static_dir.mkdir(parents=True)
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

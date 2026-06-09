@@ -1,20 +1,21 @@
 import datetime as dt
 import logging
+from dataclasses import asdict, fields
 from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Boolean, DateTime, Integer, Text, exc
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from flat_finder.database import Base
+from flat_finder.database import Base, delete_by_listing_ids
 from flat_finder.listings.model import Listing, ListingState
 from flat_finder.zones.persistence import ListingZoneDB
 
 log = logging.getLogger(__name__)
 
 
-class ListingDB(Base):
-    __tablename__ = "listings"
+class _ListingColumns:
+    """Columns shared by the live and archive listing tables."""
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     source: Mapped[str] = mapped_column(Text, nullable=False)
@@ -37,6 +38,14 @@ class ListingDB(Base):
     has_outdoor: Mapped[str] = mapped_column(Text, nullable=False, default="unknown")
     zone: Mapped[str | None] = mapped_column(Text, nullable=True)
     first_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class ListingDB(_ListingColumns, Base):
+    __tablename__ = "listings"
+
+
+class ListingArchiveDB(_ListingColumns, Base):
+    __tablename__ = "listings_archive"
 
 
 class ListingStateDB(Base):
@@ -53,32 +62,6 @@ class ListingStateDB(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
-class ListingArchiveDB(Base):
-    __tablename__ = "listings_archive"
-
-    id: Mapped[str] = mapped_column(Text, primary_key=True)
-    source: Mapped[str] = mapped_column(Text, nullable=False)
-    url: Mapped[str] = mapped_column(Text, nullable=False)
-    title: Mapped[str | None] = mapped_column(Text, nullable=True)
-    address: Mapped[str | None] = mapped_column(Text, nullable=True)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    property_type: Mapped[str | None] = mapped_column(Text, nullable=True)
-    furnishing: Mapped[str | None] = mapped_column(Text, nullable=True)
-    outdoor_type: Mapped[str | None] = mapped_column(Text, nullable=True)
-    listing_date: Mapped[str | None] = mapped_column(Text, nullable=True)
-    price_pcm: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    bedrooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    sqft: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    latitude: Mapped[float | None] = mapped_column(nullable=True)
-    longitude: Mapped[float | None] = mapped_column(nullable=True)
-    has_dishwasher: Mapped[str] = mapped_column(Text, nullable=False, default="unknown")
-    has_washer: Mapped[str] = mapped_column(Text, nullable=False, default="unknown")
-    has_outdoor: Mapped[str] = mapped_column(Text, nullable=False, default="unknown")
-    zone: Mapped[str | None] = mapped_column(Text, nullable=True)
-    first_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-
-
 class ScraperStateDB(Base):
     __tablename__ = "scraper_state"
 
@@ -86,29 +69,17 @@ class ScraperStateDB(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-_LISTING_FIELDS = (
-    "id",
-    "source",
-    "url",
-    "title",
-    "address",
-    "description",
-    "image_url",
-    "property_type",
-    "furnishing",
-    "outdoor_type",
-    "listing_date",
-    "price_pcm",
-    "bedrooms",
-    "sqft",
-    "latitude",
-    "longitude",
-    "has_dishwasher",
-    "has_washer",
-    "has_outdoor",
-    "zone",
-    "first_seen",
-)
+_LISTING_FIELDS = tuple(f.name for f in fields(Listing))
+
+_STATE_DEFAULTS: dict[str, Any] = {
+    "seen": False,
+    "favourite": False,
+    "notes": None,
+    "override_dishwasher": None,
+    "override_washer": None,
+    "override_outdoor": None,
+    "updated_at": None,
+}
 
 
 class ListingRepository:
@@ -181,39 +152,13 @@ class ListingRepository:
         result = []
         for listing_row, state_row in rows:
             d = self._listing_to_dict(listing_row)
-            if state_row:
-                d.update(
-                    seen=state_row.seen,
-                    favourite=state_row.favourite,
-                    notes=state_row.notes,
-                    override_dishwasher=state_row.override_dishwasher,
-                    override_washer=state_row.override_washer,
-                    override_outdoor=state_row.override_outdoor,
-                    updated_at=state_row.updated_at,
-                )
-            else:
-                d.update(
-                    seen=False,
-                    favourite=False,
-                    notes=None,
-                    override_dishwasher=None,
-                    override_washer=None,
-                    override_outdoor=None,
-                    updated_at=None,
-                )
+            d.update({k: getattr(state_row, k) for k in _STATE_DEFAULTS} if state_row else _STATE_DEFAULTS)
             result.append(d)
         return result
 
     def get_by_id(self, listing_id: str) -> Listing | None:
         row = self._session.get(ListingDB, listing_id)
         return self._to_domain(row) if row else None
-
-    def get_listings_in_zone_polygon(self, geometry_geojson: str) -> list[Listing]:  # noqa: ARG002
-        """Return all listings with lat/lng (polygon check done in Python with shapely)."""
-        rows = (
-            self._session.query(ListingDB).filter(ListingDB.latitude.isnot(None), ListingDB.longitude.isnot(None)).all()
-        )
-        return [self._to_domain(r) for r in rows]
 
     def archive_old(self, days: int) -> list[str]:
         """Move listings older than `days` to archive table. Returns list of archived IDs."""
@@ -233,59 +178,14 @@ class ListingRepository:
 
     @staticmethod
     def _to_domain(row: ListingDB) -> Listing:
-        first_seen = row.first_seen
-        first_seen_str = first_seen.isoformat() if isinstance(first_seen, datetime) else str(first_seen)
-        return Listing(
-            id=row.id,
-            source=row.source,
-            url=row.url,
-            title=row.title,
-            price_pcm=row.price_pcm,
-            bedrooms=row.bedrooms,
-            address=row.address,
-            latitude=row.latitude,
-            longitude=row.longitude,
-            description=row.description,
-            image_url=row.image_url,
-            property_type=row.property_type,
-            furnishing=row.furnishing,
-            sqft=row.sqft,
-            has_dishwasher=row.has_dishwasher,
-            has_washer=row.has_washer,
-            has_outdoor=row.has_outdoor,
-            outdoor_type=row.outdoor_type,
-            zone=row.zone,
-            first_seen=first_seen_str,
-            listing_date=row.listing_date,
-        )
+        data = {f: getattr(row, f) for f in _LISTING_FIELDS}
+        first_seen = data["first_seen"]
+        data["first_seen"] = first_seen.isoformat() if isinstance(first_seen, datetime) else str(first_seen)
+        return Listing(**data)
 
-    @staticmethod
-    def _listing_to_dict(row: ListingDB) -> dict[str, Any]:
-        first_seen = row.first_seen
-        first_seen_str = first_seen.isoformat() if isinstance(first_seen, datetime) else str(first_seen)
-        return {
-            "id": row.id,
-            "source": row.source,
-            "url": row.url,
-            "title": row.title,
-            "address": row.address,
-            "description": row.description,
-            "image_url": row.image_url,
-            "property_type": row.property_type,
-            "furnishing": row.furnishing,
-            "outdoor_type": row.outdoor_type,
-            "listing_date": row.listing_date,
-            "price_pcm": row.price_pcm,
-            "bedrooms": row.bedrooms,
-            "sqft": row.sqft,
-            "latitude": row.latitude,
-            "longitude": row.longitude,
-            "has_dishwasher": row.has_dishwasher,
-            "has_washer": row.has_washer,
-            "has_outdoor": row.has_outdoor,
-            "zone": row.zone,
-            "first_seen": first_seen_str,
-        }
+    @classmethod
+    def _listing_to_dict(cls, row: ListingDB) -> dict[str, Any]:
+        return asdict(cls._to_domain(row))
 
 
 class ListingStateRepository:
@@ -300,17 +200,7 @@ class ListingStateRepository:
         """Insert or update user state. Only keys present in updates are applied."""
         row = self._session.get(ListingStateDB, (user_id, listing_id))
         if row is None:
-            row = ListingStateDB(
-                user_id=user_id,
-                listing_id=listing_id,
-                seen=False,
-                favourite=False,
-                notes=None,
-                override_dishwasher=None,
-                override_washer=None,
-                override_outdoor=None,
-                updated_at=None,
-            )
+            row = ListingStateDB(user_id=user_id, listing_id=listing_id, **_STATE_DEFAULTS)
             self._session.add(row)
 
         for key, value in updates.items():
@@ -321,11 +211,7 @@ class ListingStateRepository:
         return self._to_domain(row)
 
     def delete_for_listings(self, listing_ids: list[str]) -> None:
-        if listing_ids:
-            self._session.query(ListingStateDB).filter(ListingStateDB.listing_id.in_(listing_ids)).delete(
-                synchronize_session="fetch"
-            )
-            self._session.flush()
+        delete_by_listing_ids(self._session, ListingStateDB, listing_ids)
 
     @staticmethod
     def _to_domain(row: ListingStateDB) -> ListingState:

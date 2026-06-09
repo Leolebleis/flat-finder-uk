@@ -32,7 +32,7 @@ def feed_page(
     zones = zone_service.get_user_zones(user_id)
     pois = poi_service.get_user_pois(user_id)
     zone_ids = [z["id"] for z in zones]
-    data = listing_service.get_feed_data(user_id, zone_ids, pois, sort, zone)
+    data = listing_service.get_feed_data(user_id, zone_ids, pois, sort)
     data["zones_list"] = zones  # for zone filter dropdown
     data["zone"] = zone
     return templates.TemplateResponse(request, "feed.html", data)

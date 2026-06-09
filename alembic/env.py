@@ -12,12 +12,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import Base from flat_finder.database to get target_metadata
-# Import all persistence modules to register ORM models with Base.metadata
-import flat_finder.listings.persistence  # noqa: E402
-import flat_finder.pois.persistence  # noqa: E402
-import flat_finder.users.persistence  # noqa: E402
-import flat_finder.zones.persistence  # noqa: F401, E402
+# Register all ORM models with Base.metadata
+import flat_finder.persistence  # noqa: F401, E402
 from flat_finder.database import Base  # noqa: E402
 
 target_metadata = Base.metadata
@@ -30,6 +26,7 @@ def _get_url() -> str:
     if url:
         return url
     from flat_finder import config as app_config  # noqa: PLC0415
+
     return f"sqlite:///{app_config.DB_PATH}"
 
 

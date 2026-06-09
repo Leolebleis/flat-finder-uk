@@ -3,15 +3,6 @@ from typing import Any
 from pydantic import BaseModel
 
 
-class LoginRequest(BaseModel):
-    username: str
-
-
-class LoginResponse(BaseModel):
-    username: str
-    user_id: int
-
-
 class StateUpdateRequest(BaseModel):
     seen: bool | None = None
     favourite: bool | None = None
@@ -24,7 +15,3 @@ class StateUpdateRequest(BaseModel):
 class ZoneCreateRequest(BaseModel):
     name: str
     geometry: dict[str, Any]
-
-
-class NtfyUpdateRequest(BaseModel):
-    topic: str | None = None

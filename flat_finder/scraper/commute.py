@@ -1,10 +1,17 @@
 import logging
+import time
+from collections.abc import Callable
+from typing import Any
 
 import requests
+
+from flat_finder.pois.dao import POICommuteDAO
+from flat_finder.pois.model import POI
 
 log = logging.getLogger("flat-finder")
 
 TFL_MODES = "tube,bus,overground,elizabeth-line,dlr,tram"
+TFL_RATE_LIMIT_SLEEP_S = 0.5
 
 
 def tfl_journey_mins(
@@ -30,3 +37,25 @@ def tfl_journey_mins(
     except requests.RequestException:
         log.exception("TfL journey lookup failed")
         return None
+
+
+def fetch_commutes_for_listings(
+    commute_dao: POICommuteDAO,
+    poi: POI,
+    rows: list[dict[str, Any]],
+    after_upsert: Callable[[], None] | None = None,
+) -> None:
+    """Fetch TfL commutes for the given listings and upsert results. Throttled.
+
+    `after_upsert` runs after each successful upsert (e.g. a per-row commit when
+    called from a long-lived background thread).
+    """
+    for row in rows:
+        mins = tfl_journey_mins(row["latitude"], row["longitude"], poi.lat, poi.lng)
+        if mins is None:
+            # TfL failure — no commute fetched, skip the rate-limit sleep
+            continue
+        commute_dao.upsert(row["id"], poi.id, mins)
+        if after_upsert:
+            after_upsert()
+        time.sleep(TFL_RATE_LIMIT_SLEEP_S)

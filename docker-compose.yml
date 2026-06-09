@@ -2,7 +2,7 @@ services:
   flat-finder:
     build:
       context: .
-      dockerfile: Dockerfile.ui
+      target: ui
     container_name: flat-finder
     restart: unless-stopped
     volumes:
@@ -17,7 +17,7 @@ services:
   flat-finder-scraper:
     build:
       context: .
-      dockerfile: Dockerfile.scraper
+      target: scraper
     container_name: flat-finder-scraper
     restart: unless-stopped
     volumes:
