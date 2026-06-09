@@ -85,7 +85,11 @@ class TestORMModels:
         Then it has id, username, ntfy_topic, search params, created_at
         """
         col_names = {c.name for c in UserDB.__table__.columns}
-        assert col_names == {"id", "username", "ntfy_topic", "max_rent_pcm", "min_bedrooms", "max_bedrooms", "created_at"}
+        expected = {
+            "id", "username", "ntfy_topic", "max_rent_pcm",
+            "min_bedrooms", "max_bedrooms", "created_at",
+        }
+        assert col_names == expected
 
     def test_users_username_is_unique(self):
         """Given the users table

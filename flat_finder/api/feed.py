@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 @router.get("/", response_class=HTMLResponse, name="feed_page")
-def feed_page(  # noqa: PLR0913
+def feed_page(
     request: Request,
     user_id: Annotated[int, Depends(get_current_user_id)],
     listing_service: Annotated[ListingService, Depends(get_listing_service)],

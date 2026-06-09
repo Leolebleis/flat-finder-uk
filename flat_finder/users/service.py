@@ -34,4 +34,7 @@ class UserService:
         self, user_id: int, max_rent_pcm: int | None, min_bedrooms: int | None, max_bedrooms: int | None
     ) -> None:
         self._dao.update_search_params(user_id, max_rent_pcm, min_bedrooms, max_bedrooms)
-        log.info("Updated search params for user %d: rent=%s beds=%s-%s", user_id, max_rent_pcm, min_bedrooms, max_bedrooms)
+        log.info(
+            "Updated search params for user %d: rent=%s beds=%s-%s",
+            user_id, max_rent_pcm, min_bedrooms, max_bedrooms,
+        )

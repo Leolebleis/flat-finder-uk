@@ -120,6 +120,11 @@ def update_ntfy(
     return RedirectResponse(request.url_for("settings_page"), status_code=303)
 
 
+def _parse_int_or_none(value: str) -> int | None:
+    stripped = value.strip()
+    return int(stripped) if stripped else None
+
+
 @router.post("/settings/search", name="update_search_params")
 def update_search_params(
     request: Request,
@@ -129,13 +134,10 @@ def update_search_params(
     min_bedrooms: Annotated[str, Form()] = "",
     max_bedrooms: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
-    rent = int(max_rent_pcm) if max_rent_pcm.strip() else None
+    rent = _parse_int_or_none(max_rent_pcm)
     if not rent:
         return RedirectResponse(request.url_for("settings_page"), status_code=303)
     user_service.update_search_params(
-        user_id,
-        rent,
-        int(min_bedrooms) if min_bedrooms.strip() else None,
-        int(max_bedrooms) if max_bedrooms.strip() else None,
+        user_id, rent, _parse_int_or_none(min_bedrooms), _parse_int_or_none(max_bedrooms),
     )
     return RedirectResponse(request.url_for("settings_page"), status_code=303)
