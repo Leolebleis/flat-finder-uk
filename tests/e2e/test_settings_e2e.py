@@ -126,7 +126,7 @@ class TestSearchParamsSettings:
         page.click("#search-form button[type='submit']")
         page.wait_for_url("**/settings")
         expect(page.locator("#search-display")).to_contain_text("1,800")
-        expect(page.locator("#search-display")).to_contain_text("1-2 bed")
+        expect(page.locator("#search-display")).to_contain_text("1–2 bed")  # en-dash, as rendered by template
 
     def test_search_params_persist_across_reload(self, page, app_url):
         """Given I have saved search params

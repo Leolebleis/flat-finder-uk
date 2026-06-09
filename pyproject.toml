@@ -47,7 +47,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "ANN", "PLR2004", "S104", "S106"]
+"tests/**/*.py" = ["S101", "ANN", "PLR2004", "S104", "S106", "RUF001"]
 "flat_finder/api/**/*.py" = ["PLR0913"]
 "alembic/*.py" = ["INP001"]
 "alembic/versions/*.py" = ["INP001"]
