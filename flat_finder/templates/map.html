@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Map - Flat Finder{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #map { width: 100%; height: calc(100vh - 40px); }
+
+    .map-filters {
+        position: absolute;
+        top: 50px;
+        right: 10px;
+        z-index: 1000;
+        display: flex;
+        gap: 6px;
+    }
+    .map-filters button {
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-family: var(--font-body);
+        font-size: 0.82rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    .map-filters button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .map-filters button.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+    }
+    .zone-label {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        font-family: var(--font-body);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-faint);
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="map-filters">
+    <button id="filter-all" class="active" onclick="setFilter('all')">All</button>
+    <button id="filter-unseen" onclick="setFilter('unseen')">Unseen</button>
+    <button id="filter-favourites" onclick="setFilter('favourites')">Favourites</button>
+    <button id="filter-zones" class="active" onclick="toggleZones()">Zones</button>
+</div>
+<div id="map"></div>
+<script src="{{ request.url_for('static', path='map.js') }}"></script>
+{% endblock %}

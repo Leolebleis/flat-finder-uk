@@ -9,6 +9,13 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from flat_finder import config
 from flat_finder.api.auth_routes import router as auth_router
+from flat_finder.api.detail import router as detail_router
+from flat_finder.api.feed import router as feed_router
+from flat_finder.api.listings_api import router as listings_api_router
+from flat_finder.api.map_page import router as map_router
+from flat_finder.api.settings import router as settings_router
+from flat_finder.api.state_api import router as state_api_router
+from flat_finder.api.zones_api import router as zones_api_router
 from flat_finder.database import Base, get_engine, get_session
 from flat_finder.users.auth import AuthMiddleware
 
@@ -44,6 +51,13 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     app.include_router(auth_router)
+    app.include_router(feed_router)
+    app.include_router(detail_router)
+    app.include_router(map_router)
+    app.include_router(settings_router)
+    app.include_router(zones_api_router)
+    app.include_router(state_api_router)
+    app.include_router(listings_api_router)
 
     return app
 
