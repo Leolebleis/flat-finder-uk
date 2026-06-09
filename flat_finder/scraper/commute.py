@@ -13,11 +13,22 @@ log = logging.getLogger("flat-finder")
 TFL_MODES = "tube,bus,overground,elizabeth-line,dlr,tram"
 TFL_RATE_LIMIT_SLEEP_S = 0.5
 
+# Stored in poi_commutes when TfL says no journey exists (404 — e.g. coords
+# outside the TfL network). Stops the backfill retrying the pair forever;
+# excluded from all reads by POICommuteRepository.get_for_listings.
+NO_JOURNEY = -1
+
+HTTP_NOT_FOUND = 404
+
 
 def tfl_journey_mins(
     from_lat: float, from_lng: float, to_lat: float, to_lng: float, arrive_by: str = "0830"
 ) -> int | None:
-    """Query TfL Journey Planner for shortest journey duration in minutes."""
+    """Query TfL Journey Planner for shortest journey duration in minutes.
+
+    Returns NO_JOURNEY when TfL reports no routable journey (permanent),
+    None on transient failures (worth retrying).
+    """
     url = f"https://api.tfl.gov.uk/Journey/JourneyResults/{from_lat},{from_lng}/to/{to_lat},{to_lng}"
     try:
         resp = requests.get(
@@ -34,6 +45,12 @@ def tfl_journey_mins(
         if not journeys:
             return None
         return min(j["duration"] for j in journeys)
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == HTTP_NOT_FOUND:
+            log.info("TfL: no journey from %s,%s to %s,%s (404)", from_lat, from_lng, to_lat, to_lng)
+            return NO_JOURNEY
+        log.exception("TfL journey lookup failed")
+        return None
     except requests.RequestException:
         log.exception("TfL journey lookup failed")
         return None

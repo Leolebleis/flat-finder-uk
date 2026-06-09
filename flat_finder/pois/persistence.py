@@ -97,10 +97,18 @@ class POICommuteRepository:
         self._session.flush()
 
     def get_for_listings(self, listing_ids: list[str]) -> dict[str, dict[int, int]]:
-        """Return {listing_id: {poi_id: commute_mins}} for the given listing IDs."""
+        """Return {listing_id: {poi_id: commute_mins}} for the given listing IDs.
+
+        NO_JOURNEY sentinel rows (negative commute_mins) are excluded — they
+        only exist to stop the backfill retrying unreachable pairs.
+        """
         if not listing_ids:
             return {}
-        rows = self._session.query(POICommuteDB).filter(POICommuteDB.listing_id.in_(listing_ids)).all()
+        rows = (
+            self._session.query(POICommuteDB)
+            .filter(POICommuteDB.listing_id.in_(listing_ids), POICommuteDB.commute_mins >= 0)
+            .all()
+        )
         result: dict[str, dict[int, int]] = {}
         for row in rows:
             result.setdefault(row.listing_id, {})[row.poi_id] = row.commute_mins
