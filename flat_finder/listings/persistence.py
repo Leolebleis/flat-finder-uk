@@ -97,6 +97,16 @@ class ListingRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    @staticmethod
+    def _coerce_first_seen(value: object) -> datetime:
+        """Convert first_seen to a naive datetime (UTC) for storage."""
+        if isinstance(value, datetime):
+            return value.replace(tzinfo=None) if value.tzinfo else value
+        if isinstance(value, str):
+            dt = datetime.fromisoformat(value)
+            return dt.replace(tzinfo=None) if dt.tzinfo else dt
+        return datetime.now(UTC).replace(tzinfo=None)
+
     def insert(self, listing: dict[str, Any]) -> bool:
         """Insert a listing from scraper dict format. Returns True if new, False if duplicate."""
         db_listing = ListingDB(
@@ -120,7 +130,7 @@ class ListingRepository:
             has_washer=listing.get("has_washer", "unknown"),
             has_outdoor=listing.get("has_outdoor", "unknown"),
             zone=listing.get("zone"),
-            first_seen=listing.get("first_seen", datetime.now(UTC)),
+            first_seen=self._coerce_first_seen(listing.get("first_seen")),
         )
         try:
             with self._session.begin_nested():
@@ -192,25 +202,27 @@ class ListingRepository:
         )
         return [self._to_domain(r) for r in rows]
 
-    def archive_old(self, days: int) -> int:
-        """Move listings older than `days` to archive table. Returns count archived."""
-        cutoff = datetime.now(UTC).replace(tzinfo=None) - __import__("datetime").timedelta(days=days)
+    def archive_old(self, days: int) -> list[str]:
+        """Move listings older than `days` to archive table. Returns list of archived IDs."""
+        import datetime as dt
+
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - dt.timedelta(days=days)
 
         old_rows = (
             self._session.query(ListingDB)
             .filter(ListingDB.first_seen < cutoff)
             .all()
         )
-        count = len(old_rows)
+        archived_ids = [row.id for row in old_rows]
         for row in old_rows:
             archive = ListingArchiveDB(**{f: getattr(row, f) for f in _LISTING_FIELDS})
             self._session.add(archive)
             self._session.delete(row)
 
-        if count:
+        if archived_ids:
             self._session.flush()
-            log.info("Archived %d old listings", count)
-        return count
+            log.info("Archived %d old listings", len(archived_ids))
+        return archived_ids
 
     @staticmethod
     def _to_domain(row: ListingDB) -> Listing:
