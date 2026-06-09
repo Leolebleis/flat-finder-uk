@@ -11,8 +11,15 @@ import pytest
 import uvicorn
 
 
-def _run_server() -> None:
-    """Entry point for the server subprocess (must be module-level for Windows spawn)."""
+def _run_server(db_path: str, secret_key: str) -> None:
+    """Entry point for the server subprocess."""
+    os.environ["FLAT_FINDER_DB"] = db_path
+    os.environ["SECRET_KEY"] = secret_key
+    import importlib  # noqa: PLC0415
+
+    import flat_finder.config  # noqa: PLC0415
+
+    importlib.reload(flat_finder.config)
     uvicorn.run("flat_finder.api.app:app", host="127.0.0.1", port=8765, log_level="warning")
 
 
@@ -25,7 +32,7 @@ def live_server(tmp_path_factory):
     os.environ["FLAT_FINDER_DB"] = str(db_path)
     os.environ["SECRET_KEY"] = "e2e-test-secret"  # noqa: S105
 
-    proc = Process(target=_run_server, daemon=True)
+    proc = Process(target=_run_server, args=(str(db_path), "e2e-test-secret"), daemon=True)
     proc.start()
 
     # Wait for server to be ready (up to 5 s)
