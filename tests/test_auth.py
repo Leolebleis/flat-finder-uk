@@ -1,4 +1,5 @@
 """E2E tests for auth: login, logout, nav bar."""
+
 from pathlib import Path
 
 from fastapi.testclient import TestClient

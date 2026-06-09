@@ -1,4 +1,5 @@
 """E2E tests for the state API — per-user listing state."""
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -114,9 +115,7 @@ class TestStateAPIUserScoping:
         assert resp.status_code == 200
         assert resp.json()["seen"] is True
 
-    def test_state_independent_between_users(
-        self, db_session, leo_client, amelie_client
-    ) -> None:
+    def test_state_independent_between_users(self, db_session, leo_client, amelie_client) -> None:
         """Given Leo and Amelie both have the same listing in their zones
         When Leo favourites it
         Then Amelie's state is unaffected (not favourited).
@@ -132,12 +131,28 @@ class TestStateAPIUserScoping:
         zone_repo = ZoneRepository(db_session)
         lz_repo = ListingZoneRepository(db_session)
 
-        leo_zone = zone_repo.create(leo.id, "Leo Zone",
+        leo_zone = zone_repo.create(
+            leo.id,
+            "Leo Zone",
             '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}',
-            51.5, -0.1, 5.0, None, None, 0)
-        amelie_zone = zone_repo.create(amelie.id, "Amelie Zone",
+            51.5,
+            -0.1,
+            5.0,
+            None,
+            None,
+            0,
+        )
+        amelie_zone = zone_repo.create(
+            amelie.id,
+            "Amelie Zone",
             '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}',
-            51.5, -0.1, 5.0, None, None, 1)
+            51.5,
+            -0.1,
+            5.0,
+            None,
+            None,
+            1,
+        )
         lz_repo.link("shared_listing", leo_zone.id)
         lz_repo.link("shared_listing", amelie_zone.id)
         db_session.commit()
@@ -151,15 +166,15 @@ class TestStateAPIUserScoping:
         assert amelie_resp.json()["favourite"] is False
 
     def test_state_update_returns_404_for_unknown_listing(
-        self, db_session, leo_client  # noqa: ARG002
+        self,
+        db_session,  # noqa: ARG002
+        leo_client,
     ) -> None:
         """Given a listing does not exist
         When Leo tries to update its state
         Then he receives a 404 error.
         """
-        resp = leo_client.post(
-            "/api/state/nonexistent_listing", json={"seen": True}
-        )
+        resp = leo_client.post("/api/state/nonexistent_listing", json={"seen": True})
         assert resp.status_code == 404
 
     def test_notes_saved_per_user(self, db_session, leo_client, amelie_client) -> None:
@@ -175,12 +190,28 @@ class TestStateAPIUserScoping:
 
         zone_repo = ZoneRepository(db_session)
         lz_repo = ListingZoneRepository(db_session)
-        leo_zone = zone_repo.create(leo.id, "L Zone",
+        leo_zone = zone_repo.create(
+            leo.id,
+            "L Zone",
             '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}',
-            51.5, -0.1, 5.0, None, None, 0)
-        amelie_zone = zone_repo.create(amelie.id, "A Zone",
+            51.5,
+            -0.1,
+            5.0,
+            None,
+            None,
+            0,
+        )
+        amelie_zone = zone_repo.create(
+            amelie.id,
+            "A Zone",
             '{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}',
-            51.5, -0.1, 5.0, None, None, 1)
+            51.5,
+            -0.1,
+            5.0,
+            None,
+            None,
+            1,
+        )
         lz_repo.link("shared_notes", leo_zone.id)
         lz_repo.link("shared_notes", amelie_zone.id)
         db_session.commit()

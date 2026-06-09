@@ -87,10 +87,27 @@ class ScraperStateDB(Base):
 
 
 _LISTING_FIELDS = (
-    "id", "source", "url", "title", "address", "description", "image_url",
-    "property_type", "furnishing", "outdoor_type", "listing_date", "price_pcm",
-    "bedrooms", "sqft", "latitude", "longitude", "has_dishwasher", "has_washer",
-    "has_outdoor", "zone", "first_seen",
+    "id",
+    "source",
+    "url",
+    "title",
+    "address",
+    "description",
+    "image_url",
+    "property_type",
+    "furnishing",
+    "outdoor_type",
+    "listing_date",
+    "price_pcm",
+    "bedrooms",
+    "sqft",
+    "latitude",
+    "longitude",
+    "has_dishwasher",
+    "has_washer",
+    "has_outdoor",
+    "zone",
+    "first_seen",
 )
 
 
@@ -148,17 +165,14 @@ class ListingRepository:
             return []
 
         listing_ids_in_zones = (
-            self._session.query(ListingZoneDB.listing_id)
-            .filter(ListingZoneDB.zone_id.in_(zone_ids))
-            .scalar_subquery()
+            self._session.query(ListingZoneDB.listing_id).filter(ListingZoneDB.zone_id.in_(zone_ids)).scalar_subquery()
         )
 
         rows = (
             self._session.query(ListingDB, ListingStateDB)
             .outerjoin(
                 ListingStateDB,
-                (ListingStateDB.listing_id == ListingDB.id)
-                & (ListingStateDB.user_id == user_id),
+                (ListingStateDB.listing_id == ListingDB.id) & (ListingStateDB.user_id == user_id),
             )
             .filter(ListingDB.id.in_(listing_ids_in_zones))
             .all()
@@ -197,9 +211,7 @@ class ListingRepository:
     def get_listings_in_zone_polygon(self, geometry_geojson: str) -> list[Listing]:  # noqa: ARG002
         """Return all listings with lat/lng (polygon check done in Python with shapely)."""
         rows = (
-            self._session.query(ListingDB)
-            .filter(ListingDB.latitude.isnot(None), ListingDB.longitude.isnot(None))
-            .all()
+            self._session.query(ListingDB).filter(ListingDB.latitude.isnot(None), ListingDB.longitude.isnot(None)).all()
         )
         return [self._to_domain(r) for r in rows]
 
@@ -207,11 +219,7 @@ class ListingRepository:
         """Move listings older than `days` to archive table. Returns list of archived IDs."""
         cutoff = datetime.now(UTC).replace(tzinfo=None) - dt.timedelta(days=days)
 
-        old_rows = (
-            self._session.query(ListingDB)
-            .filter(ListingDB.first_seen < cutoff)
-            .all()
-        )
+        old_rows = self._session.query(ListingDB).filter(ListingDB.first_seen < cutoff).all()
         archived_ids = [row.id for row in old_rows]
         for row in old_rows:
             archive = ListingArchiveDB(**{f: getattr(row, f) for f in _LISTING_FIELDS})
@@ -314,9 +322,9 @@ class ListingStateRepository:
 
     def delete_for_listings(self, listing_ids: list[str]) -> None:
         if listing_ids:
-            self._session.query(ListingStateDB).filter(
-                ListingStateDB.listing_id.in_(listing_ids)
-            ).delete(synchronize_session="fetch")
+            self._session.query(ListingStateDB).filter(ListingStateDB.listing_id.in_(listing_ids)).delete(
+                synchronize_session="fetch"
+            )
             self._session.flush()
 
     @staticmethod

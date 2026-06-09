@@ -60,9 +60,7 @@ class POIRepository:
 
     def delete(self, poi_id: int) -> None:
         """Delete POI and cascade-delete associated poi_commutes."""
-        self._session.query(POICommuteDB).filter_by(poi_id=poi_id).delete(
-            synchronize_session="fetch"
-        )
+        self._session.query(POICommuteDB).filter_by(poi_id=poi_id).delete(synchronize_session="fetch")
         row = self._session.get(POIDB, poi_id)
         if row:
             self._session.delete(row)
@@ -98,11 +96,7 @@ class POICommuteRepository:
         """Return {listing_id: {poi_id: commute_mins}} for the given listing IDs."""
         if not listing_ids:
             return {}
-        rows = (
-            self._session.query(POICommuteDB)
-            .filter(POICommuteDB.listing_id.in_(listing_ids))
-            .all()
-        )
+        rows = self._session.query(POICommuteDB).filter(POICommuteDB.listing_id.in_(listing_ids)).all()
         result: dict[str, dict[int, int]] = {}
         for row in rows:
             result.setdefault(row.listing_id, {})[row.poi_id] = row.commute_mins
@@ -110,11 +104,7 @@ class POICommuteRepository:
 
     def get_listings_missing_poi(self, poi_id: int) -> list[dict[str, Any]]:
         """Return listings with lat/lng that do not yet have a commute for poi_id."""
-        existing_ids = (
-            self._session.query(POICommuteDB.listing_id)
-            .filter_by(poi_id=poi_id)
-            .scalar_subquery()
-        )
+        existing_ids = self._session.query(POICommuteDB.listing_id).filter_by(poi_id=poi_id).scalar_subquery()
         rows = (
             self._session.query(ListingDB)
             .filter(
@@ -128,9 +118,9 @@ class POICommuteRepository:
 
     def delete_for_listings(self, listing_ids: list[str]) -> None:
         if listing_ids:
-            self._session.query(POICommuteDB).filter(
-                POICommuteDB.listing_id.in_(listing_ids)
-            ).delete(synchronize_session="fetch")
+            self._session.query(POICommuteDB).filter(POICommuteDB.listing_id.in_(listing_ids)).delete(
+                synchronize_session="fetch"
+            )
             self._session.flush()
 
     @staticmethod

@@ -1,4 +1,5 @@
 """E2E tests for the settings page — ntfy topic and POI user scoping."""
+
 import pytest
 from fastapi.testclient import TestClient
 from flat_finder.pois.persistence import POIRepository
@@ -62,9 +63,7 @@ class TestNtfySettings:
         # Set first
         leo_client.post("/settings/ntfy", data={"topic": "leo-alerts"})
         # Clear
-        resp = leo_client.post(
-            "/settings/ntfy", data={"topic": ""}, follow_redirects=True
-        )
+        resp = leo_client.post("/settings/ntfy", data={"topic": ""}, follow_redirects=True)
         assert resp.status_code == 200
         # Verify topic is cleared in DB
         leo = UserRepository(db_session).get_by_username("leo")
@@ -100,7 +99,10 @@ class TestPOIUserScoping:
     """
 
     def test_user_only_sees_own_pois(
-        self, db_session, leo_client, amelie_client  # noqa: ARG002
+        self,
+        db_session,
+        leo_client,
+        amelie_client,  # noqa: ARG002
     ) -> None:
         """Given Leo adds POI 'Leo Work' and Amelie adds POI 'Amelie HQ'
         When Leo views the settings page
@@ -119,9 +121,7 @@ class TestPOIUserScoping:
         assert "Leo Work" in resp.text
         assert "Amelie HQ" not in resp.text
 
-    def test_add_poi_assigned_to_current_user(
-        self, db_session, leo_client
-    ) -> None:
+    def test_add_poi_assigned_to_current_user(self, db_session, leo_client) -> None:
         """Given Leo adds a POI via the settings form
         When we query the DB for Leo's POIs
         Then the new POI is in his list.
@@ -139,7 +139,10 @@ class TestPOIUserScoping:
         assert "Library" in resp.text
 
     def test_delete_other_users_poi_returns_error(
-        self, db_session, leo_client, amelie_client  # noqa: ARG002
+        self,
+        db_session,
+        leo_client,
+        amelie_client,  # noqa: ARG002
     ) -> None:
         """Given Amelie has a POI
         When Leo tries to delete it

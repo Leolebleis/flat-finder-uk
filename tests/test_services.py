@@ -408,8 +408,8 @@ class TestListingServiceSorting:
         _insert_listing(db_session, listing_id="bm_far", price_pcm=1000)
         _link_listing_to_zone(db_session, "bm_near", zone.id)
         _link_listing_to_zone(db_session, "bm_far", zone.id)
-        commute_repo.upsert("bm_near", poi.id, 5)   # very short commute
-        commute_repo.upsert("bm_far", poi.id, 60)   # long commute
+        commute_repo.upsert("bm_near", poi.id, 5)  # very short commute
+        commute_repo.upsert("bm_far", poi.id, 60)  # long commute
 
         pois_dicts = [{"id": poi.id, "name": poi.name, "color_index": poi.color_index}]
         result = svc.get_feed_data(user.id, [zone.id], pois=pois_dicts, sort="best_match")

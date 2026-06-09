@@ -129,16 +129,12 @@ class ListingZoneRepository:
     def get_listing_ids_for_zones(self, zone_ids: list[int]) -> list[str]:
         if not zone_ids:
             return []
-        rows = (
-            self._session.query(ListingZoneDB)
-            .filter(ListingZoneDB.zone_id.in_(zone_ids))
-            .all()
-        )
+        rows = self._session.query(ListingZoneDB).filter(ListingZoneDB.zone_id.in_(zone_ids)).all()
         return list({r.listing_id for r in rows})
 
     def delete_for_listings(self, listing_ids: list[str]) -> None:
         if listing_ids:
-            self._session.query(ListingZoneDB).filter(
-                ListingZoneDB.listing_id.in_(listing_ids)
-            ).delete(synchronize_session="fetch")
+            self._session.query(ListingZoneDB).filter(ListingZoneDB.listing_id.in_(listing_ids)).delete(
+                synchronize_session="fetch"
+            )
             self._session.flush()

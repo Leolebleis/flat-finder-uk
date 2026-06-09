@@ -65,11 +65,7 @@ def _compute_scores(
 
     stats: dict[int, dict[str, float]] = {}
     for pid in poi_ids:
-        vals = [
-            listing["poi_commutes"][pid]
-            for listing in listings
-            if pid in listing.get("poi_commutes", {})
-        ]
+        vals = [listing["poi_commutes"][pid] for listing in listings if pid in listing.get("poi_commutes", {})]
         if vals:
             mn, mx = min(vals), max(vals)
             stats[pid] = {"min": mn, "max": mx, "range": mx - mn if mx != mn else 1}

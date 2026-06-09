@@ -25,7 +25,5 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         user_id = request.session.get("user_id")
         if not user_id:
-            return RedirectResponse(
-                url=f"{request.app.root_path}{LOGIN_PATH}", status_code=303
-            )
+            return RedirectResponse(url=f"{request.app.root_path}{LOGIN_PATH}", status_code=303)
         return await call_next(request)

@@ -24,9 +24,7 @@ def login_submit(
     username: Annotated[str, Form()] = "",
 ) -> HTMLResponse | RedirectResponse:
     if not username.strip():
-        return templates.TemplateResponse(
-            request, "login.html", {"error": "Username is required"}, status_code=200
-        )
+        return templates.TemplateResponse(request, "login.html", {"error": "Username is required"}, status_code=200)
     user = user_service.login(username)
     request.session["user_id"] = user.id
     request.session["username"] = user.username

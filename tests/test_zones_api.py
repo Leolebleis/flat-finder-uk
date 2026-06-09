@@ -1,4 +1,5 @@
 """E2E tests for the zones API — user-scoped CRUD."""
+
 import json
 
 import pytest
@@ -61,7 +62,10 @@ class TestZoneAPIUserScoping:
     """
 
     def test_get_zones_returns_only_own(
-        self, db_session, leo_client, amelie_client  # noqa: ARG002
+        self,
+        db_session,
+        leo_client,
+        amelie_client,  # noqa: ARG002
     ) -> None:
         """Given Leo has zone 'North' and Amelie has zone 'South'
         When Leo calls GET /api/zones
@@ -72,12 +76,26 @@ class TestZoneAPIUserScoping:
 
         zone_repo = ZoneRepository(db_session)
         zone_repo.create(
-            leo.id, "North",
-            json.dumps(_TRIANGLE), 51.5, -0.1, 5.0, None, None, 0,
+            leo.id,
+            "North",
+            json.dumps(_TRIANGLE),
+            51.5,
+            -0.1,
+            5.0,
+            None,
+            None,
+            0,
         )
         zone_repo.create(
-            amelie.id, "South",
-            json.dumps(_TRIANGLE), 51.4, -0.1, 5.0, None, None, 1,
+            amelie.id,
+            "South",
+            json.dumps(_TRIANGLE),
+            51.4,
+            -0.1,
+            5.0,
+            None,
+            None,
+            1,
         )
         db_session.commit()
 
@@ -107,7 +125,10 @@ class TestZoneAPIUserScoping:
             assert zone_data["name"] == "My Zone"
 
     def test_delete_other_users_zone_fails(
-        self, db_session, leo_client, amelie_client  # noqa: ARG002
+        self,
+        db_session,
+        leo_client,
+        amelie_client,  # noqa: ARG002
     ) -> None:
         """Given Amelie has a zone
         When Leo tries to delete it
@@ -116,8 +137,15 @@ class TestZoneAPIUserScoping:
         amelie = UserRepository(db_session).get_by_username("amelie")
         zone_repo = ZoneRepository(db_session)
         zone = zone_repo.create(
-            amelie.id, "Amelie Zone",
-            json.dumps(_TRIANGLE), 51.4, -0.1, 5.0, None, None, 0,
+            amelie.id,
+            "Amelie Zone",
+            json.dumps(_TRIANGLE),
+            51.4,
+            -0.1,
+            5.0,
+            None,
+            None,
+            0,
         )
         db_session.commit()
 
@@ -125,7 +153,10 @@ class TestZoneAPIUserScoping:
         assert resp.status_code == 404
 
     def test_update_other_users_zone_fails(
-        self, db_session, leo_client, amelie_client  # noqa: ARG002
+        self,
+        db_session,
+        leo_client,
+        amelie_client,  # noqa: ARG002
     ) -> None:
         """Given Amelie has a zone
         When Leo tries to update it via PUT
@@ -134,8 +165,15 @@ class TestZoneAPIUserScoping:
         amelie = UserRepository(db_session).get_by_username("amelie")
         zone_repo = ZoneRepository(db_session)
         zone = zone_repo.create(
-            amelie.id, "Amelie Zone",
-            json.dumps(_TRIANGLE), 51.4, -0.1, 5.0, None, None, 0,
+            amelie.id,
+            "Amelie Zone",
+            json.dumps(_TRIANGLE),
+            51.4,
+            -0.1,
+            5.0,
+            None,
+            None,
+            0,
         )
         db_session.commit()
 
@@ -153,8 +191,15 @@ class TestZoneAPIUserScoping:
         leo = UserRepository(db_session).get_by_username("leo")
         zone_repo = ZoneRepository(db_session)
         zone = zone_repo.create(
-            leo.id, "To Delete",
-            json.dumps(_TRIANGLE), 51.5, -0.1, 5.0, None, None, 0,
+            leo.id,
+            "To Delete",
+            json.dumps(_TRIANGLE),
+            51.5,
+            -0.1,
+            5.0,
+            None,
+            None,
+            0,
         )
         db_session.commit()
 

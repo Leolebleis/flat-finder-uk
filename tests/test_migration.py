@@ -29,14 +29,24 @@ class TestFreshMigration:
         command.upgrade(cfg, "head")
 
         conn = sqlite3.connect(db_path)
-        tables = {row[0] for row in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'alembic%'"
-        ).fetchall()}
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'alembic%'"
+            ).fetchall()
+        }
         conn.close()
 
         assert tables == {
-            "users", "listings", "user_state", "listings_archive",
-            "scraper_state", "zones", "listing_zones", "pois", "poi_commutes",
+            "users",
+            "listings",
+            "user_state",
+            "listings_archive",
+            "scraper_state",
+            "zones",
+            "listing_zones",
+            "pois",
+            "poi_commutes",
         }
 
     def test_user_state_has_composite_pk(self, tmp_path):
@@ -78,9 +88,12 @@ class TestFreshMigration:
         command.upgrade(cfg, "head")
 
         conn = sqlite3.connect(db_path)
-        indexes = {row[1] for row in conn.execute(
-            "SELECT * FROM sqlite_master WHERE type='index' AND tbl_name='listings_archive'"
-        ).fetchall()}
+        indexes = {
+            row[1]
+            for row in conn.execute(
+                "SELECT * FROM sqlite_master WHERE type='index' AND tbl_name='listings_archive'"
+            ).fetchall()
+        }
         conn.close()
         assert len(indexes) >= 2  # at least the two analytics indexes
 
@@ -95,8 +108,11 @@ class TestFreshMigration:
         command.downgrade(cfg, "base")
 
         conn = sqlite3.connect(db_path)
-        tables = {row[0] for row in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'alembic%'"
-        ).fetchall()}
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'alembic%'"
+            ).fetchall()
+        }
         conn.close()
         assert len(tables) == 0

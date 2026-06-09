@@ -3,6 +3,7 @@
 All external HTTP calls (Rightmove, OpenRent, TfL, ntfy) are mocked.
 Uses a real SQLite DB via the conftest db_session fixture.
 """
+
 import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch

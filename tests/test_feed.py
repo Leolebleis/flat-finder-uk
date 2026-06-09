@@ -1,4 +1,5 @@
 """E2E tests for the feed page — user-scoped listing display."""
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -101,7 +102,11 @@ class TestFeedUserScoping:
     """
 
     def test_user_sees_only_listings_in_their_zones(
-        self, app, db_session, leo_client, amelie_client  # noqa: ARG002
+        self,
+        app,  # noqa: ARG002
+        db_session,
+        leo_client,
+        amelie_client,  # noqa: ARG002
     ) -> None:
         """Given Leo has zone A with listing 1, Amelie has zone B with listing 2
         When Leo views the feed
@@ -140,7 +145,11 @@ class TestFeedUserScoping:
         assert "South London" in resp.text
 
     def test_favourite_state_independent_per_user(
-        self, app, db_session, leo_client, amelie_client  # noqa: ARG002
+        self,
+        app,  # noqa: ARG002
+        db_session,
+        leo_client,
+        amelie_client,
     ) -> None:
         """Given a shared listing in both users' zones
         When Leo favourites it and Amelie views it
