@@ -47,6 +47,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "ANN", "PLR2004", "S104", "S106"]
+"alembic/*.py" = ["INP001"]
+"alembic/versions/*.py" = ["INP001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
