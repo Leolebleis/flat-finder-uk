@@ -6,8 +6,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from scraper.commute import tfl_journey_mins
-from shared.geo import extract_coords_from_url
+from flat_finder.geo import extract_coords_from_url
+from flat_finder.scraper.commute import tfl_journey_mins
 from sqlalchemy.orm import Session
 
 from flat_finder.api.dependencies import (

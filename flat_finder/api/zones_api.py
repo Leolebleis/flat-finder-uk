@@ -3,7 +3,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from shared.zones import compute_zone_params, resolve_postcode, resolve_rightmove_id
+from flat_finder.zone_utils import compute_zone_params, resolve_postcode, resolve_rightmove_id
 
 from flat_finder.api.dependencies import get_current_user_id, get_zone_service
 from flat_finder.api.schemas import ZoneCreateRequest
