@@ -1,7 +1,13 @@
+import logging
+from datetime import UTC, datetime
+
 from sqlalchemy import Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from flat_finder.database import Base
+from flat_finder.users.model import User
+
+log = logging.getLogger(__name__)
 
 
 class UserDB(Base):
@@ -11,3 +17,42 @@ class UserDB(Base):
     username: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     ntfy_topic: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class UserRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create(self, username: str) -> User:
+        db_user = UserDB(username=username, created_at=datetime.now(UTC).isoformat())
+        self._session.add(db_user)
+        self._session.flush()
+        log.info("Created user: %s (id=%d)", username, db_user.id)
+        return self._to_domain(db_user)
+
+    def get_by_username(self, username: str) -> User | None:
+        row = self._session.query(UserDB).filter_by(username=username).first()
+        return self._to_domain(row) if row else None
+
+    def get_by_id(self, user_id: int) -> User | None:
+        row = self._session.get(UserDB, user_id)
+        return self._to_domain(row) if row else None
+
+    def update_ntfy_topic(self, user_id: int, topic: str | None) -> None:
+        row = self._session.get(UserDB, user_id)
+        if row:
+            row.ntfy_topic = topic
+            self._session.flush()
+
+    def get_all_with_ntfy(self) -> list[User]:
+        rows = self._session.query(UserDB).filter(UserDB.ntfy_topic.isnot(None)).all()
+        return [self._to_domain(r) for r in rows]
+
+    @staticmethod
+    def _to_domain(row: UserDB) -> User:
+        return User(
+            id=row.id,
+            username=row.username,
+            ntfy_topic=row.ntfy_topic,
+            created_at=row.created_at,
+        )
