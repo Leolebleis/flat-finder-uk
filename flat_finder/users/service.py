@@ -26,6 +26,12 @@ class UserService:
 
     def update_ntfy_topic(self, user_id: int, topic: str | None) -> None:
         clean = topic.strip() if topic else None
-        clean = clean or None  # empty string -> None
+        clean = clean or None
         self._dao.update_ntfy_topic(user_id, clean)
         log.info("Updated ntfy topic for user %d", user_id)
+
+    def update_search_params(
+        self, user_id: int, max_rent_pcm: int | None, min_bedrooms: int | None, max_bedrooms: int | None
+    ) -> None:
+        self._dao.update_search_params(user_id, max_rent_pcm, min_bedrooms, max_bedrooms)
+        log.info("Updated search params for user %d: rent=%s beds=%s-%s", user_id, max_rent_pcm, min_bedrooms, max_bedrooms)

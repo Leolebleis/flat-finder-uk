@@ -69,6 +69,9 @@ def settings_page(
             "zones": zones,
             "poi_colors": POI_COLORS,
             "ntfy_topic": user.ntfy_topic if user else None,
+            "max_rent_pcm": user.max_rent_pcm if user else None,
+            "min_bedrooms": user.min_bedrooms if user else None,
+            "max_bedrooms": user.max_bedrooms if user else None,
         },
     )
 
@@ -114,4 +117,25 @@ def update_ntfy(
     topic: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
     user_service.update_ntfy_topic(user_id, topic)
+    return RedirectResponse(request.url_for("settings_page"), status_code=303)
+
+
+@router.post("/settings/search", name="update_search_params")
+def update_search_params(
+    request: Request,
+    user_id: Annotated[int, Depends(get_current_user_id)],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+    max_rent_pcm: Annotated[str, Form()] = "",
+    min_bedrooms: Annotated[str, Form()] = "",
+    max_bedrooms: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    rent = int(max_rent_pcm) if max_rent_pcm.strip() else None
+    if not rent:
+        return RedirectResponse(request.url_for("settings_page"), status_code=303)
+    user_service.update_search_params(
+        user_id,
+        rent,
+        int(min_bedrooms) if min_bedrooms.strip() else None,
+        int(max_bedrooms) if max_bedrooms.strip() else None,
+    )
     return RedirectResponse(request.url_for("settings_page"), status_code=303)

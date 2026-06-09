@@ -16,6 +16,9 @@ class UserDB(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     ntfy_topic: Mapped[str | None] = mapped_column(Text, nullable=True)
+    max_rent_pcm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    min_bedrooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_bedrooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[str] = mapped_column(String, nullable=False)
 
 
@@ -24,7 +27,7 @@ class UserRepository:
         self._session = session
 
     def create(self, username: str) -> User:
-        db_user = UserDB(username=username, created_at=datetime.now(UTC).isoformat())
+        db_user = UserDB(username=username, max_rent_pcm=2200, created_at=datetime.now(UTC).isoformat())
         self._session.add(db_user)
         self._session.flush()
         log.info("Created user: %s (id=%d)", username, db_user.id)
@@ -44,6 +47,20 @@ class UserRepository:
             row.ntfy_topic = topic
             self._session.flush()
 
+    def update_search_params(
+        self, user_id: int, max_rent_pcm: int | None, min_bedrooms: int | None, max_bedrooms: int | None
+    ) -> None:
+        row = self._session.get(UserDB, user_id)
+        if row:
+            row.max_rent_pcm = max_rent_pcm
+            row.min_bedrooms = min_bedrooms
+            row.max_bedrooms = max_bedrooms
+            self._session.flush()
+
+    def get_all(self) -> list[User]:
+        rows = self._session.query(UserDB).all()
+        return [self._to_domain(r) for r in rows]
+
     def get_all_with_ntfy(self) -> list[User]:
         rows = self._session.query(UserDB).filter(UserDB.ntfy_topic.isnot(None)).all()
         return [self._to_domain(r) for r in rows]
@@ -54,5 +71,8 @@ class UserRepository:
             id=row.id,
             username=row.username,
             ntfy_topic=row.ntfy_topic,
+            max_rent_pcm=row.max_rent_pcm,
+            min_bedrooms=row.min_bedrooms,
+            max_bedrooms=row.max_bedrooms,
             created_at=row.created_at,
         )

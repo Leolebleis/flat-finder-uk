@@ -183,13 +183,21 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         seen_ids: set[str] = set()
         seen_fingerprints: set[tuple[str, int, int]] = set()
 
-        # Use first zone's ntfy_topic for failure/recovery notifications (global scraper health)
-        # Fall back to global config if no users have ntfy set
-        users_with_ntfy = user_repo.get_all_with_ntfy()
+        # Compute search params: widest range across all users, fall back to config defaults
+        all_users = user_repo.get_all()
+        user_rents = [u.max_rent_pcm for u in all_users if u.max_rent_pcm]
+        user_min_beds = [u.min_bedrooms for u in all_users if u.min_bedrooms is not None]
+        user_max_beds = [u.max_bedrooms for u in all_users if u.max_bedrooms is not None]
+        search_max_rent = max(user_rents) if user_rents else config.MAX_RENT_PCM
+        search_min_beds = min(user_min_beds) if user_min_beds else config.MIN_BEDROOMS
+        search_max_beds = max(user_max_beds) if user_max_beds else config.MAX_BEDROOMS
+        log.info("Search params (widest): rent=%d, beds=%d-%d", search_max_rent, search_min_beds, search_max_beds)
+
+        # Use first user's ntfy_topic for failure/recovery notifications (global scraper health)
+        users_with_ntfy = [u for u in all_users if u.ntfy_topic]
         health_ntfy_topic = users_with_ntfy[0].ntfy_topic if users_with_ntfy else None
 
         # Track which zone each listing came from (before dedup)
-        # zone_id -> list of listing dicts found in that zone
         zone_listings_map: dict[int, list[dict[str, Any]]] = {}
 
         for zone in all_zones:
@@ -200,13 +208,13 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             rm_listings, rm_error = _scrape_source(
                 f"rightmove/{zone.name}",
                 lambda z=zone, r=rm_radius_miles: fetch_rightmove(
-                    z.rightmove_id or "", r, config.MIN_BEDROOMS, config.MAX_BEDROOMS, config.MAX_RENT_PCM
+                    z.rightmove_id or "", r, search_min_beds, search_max_beds, search_max_rent
                 ),
             )
             or_listings, or_error = _scrape_source(
                 f"openrent/{zone.name}",
                 lambda z=zone, r=or_radius_km: fetch_openrent(
-                    z.openrent_term or "", r, config.MIN_BEDROOMS, config.MAX_BEDROOMS, config.MAX_RENT_PCM
+                    z.openrent_term or "", r, search_min_beds, search_max_beds, search_max_rent
                 ),
             )
 

@@ -82,10 +82,10 @@ class TestORMModels:
     def test_users_table_has_expected_columns(self):
         """Given the users table
         When I inspect its columns
-        Then it has id, username, ntfy_topic, created_at
+        Then it has id, username, ntfy_topic, search params, created_at
         """
         col_names = {c.name for c in UserDB.__table__.columns}
-        assert col_names == {"id", "username", "ntfy_topic", "created_at"}
+        assert col_names == {"id", "username", "ntfy_topic", "max_rent_pcm", "min_bedrooms", "max_bedrooms", "created_at"}
 
     def test_users_username_is_unique(self):
         """Given the users table
