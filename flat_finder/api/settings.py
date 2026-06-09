@@ -138,6 +138,9 @@ def update_search_params(
     if not rent:
         return RedirectResponse(request.url_for("settings_page"), status_code=303)
     user_service.update_search_params(
-        user_id, rent, _parse_int_or_none(min_bedrooms), _parse_int_or_none(max_bedrooms),
+        user_id,
+        rent,
+        _parse_int_or_none(min_bedrooms),
+        _parse_int_or_none(max_bedrooms),
     )
     return RedirectResponse(request.url_for("settings_page"), status_code=303)

@@ -86,8 +86,13 @@ class TestORMModels:
         """
         col_names = {c.name for c in UserDB.__table__.columns}
         expected = {
-            "id", "username", "ntfy_topic", "max_rent_pcm",
-            "min_bedrooms", "max_bedrooms", "created_at",
+            "id",
+            "username",
+            "ntfy_topic",
+            "max_rent_pcm",
+            "min_bedrooms",
+            "max_bedrooms",
+            "created_at",
         }
         assert col_names == expected
 
