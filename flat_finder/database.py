@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
 
 
 def _set_sqlite_pragmas(dbapi_conn: object, _connection_record: object) -> None:
-    cursor = dbapi_conn.cursor()  # type: ignore[union-attr]
+    cursor = dbapi_conn.cursor()  # ty: ignore[unresolved-attribute]
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA busy_timeout=5000")
     cursor.close()

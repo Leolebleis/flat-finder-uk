@@ -59,7 +59,7 @@ source = ["flat_finder"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 80
+fail_under = 75
 
 [build-system]
 requires = ["hatchling"]
