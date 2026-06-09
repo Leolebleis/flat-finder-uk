@@ -6,9 +6,11 @@ import os
 import time
 from multiprocessing import Process
 
+import flat_finder.persistence  # noqa: F401 — registers ORM models on Base.metadata
 import httpx
 import pytest
 import uvicorn
+from flat_finder.database import Base, get_engine
 
 
 def _run_server(db_path: str, secret_key: str) -> None:
@@ -27,6 +29,12 @@ def _run_server(db_path: str, secret_key: str) -> None:
 def live_server(tmp_path_factory):
     """Start a real uvicorn server with a fresh DB for the entire E2E session."""
     db_path = tmp_path_factory.mktemp("e2e") / "test.db"
+
+    # Create the schema up front — in production this is Alembic's job,
+    # which runs before the app starts.
+    engine = get_engine(db_path)
+    Base.metadata.create_all(engine)
+    engine.dispose()
 
     # Set env vars before spawning so the child process inherits them
     os.environ["FLAT_FINDER_DB"] = str(db_path)

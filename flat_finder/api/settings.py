@@ -115,7 +115,7 @@ def _parse_int_or_none(value: str) -> int | None:
 
 
 @router.post("/settings/search", name="update_search_params")
-def update_search_params(  # noqa: PLR0913
+def update_search_params(
     request: Request,
     user_id: Annotated[int, Depends(get_current_user_id)],
     user_service: Annotated[UserService, Depends(get_user_service)],
