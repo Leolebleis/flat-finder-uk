@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flat Finder — Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='v2.css') }}">
+    <style>
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .login-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: var(--shadow);
+        }
+        .login-card__title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--text);
+            letter-spacing: -0.02em;
+        }
+        .login-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            margin-bottom: 0.25rem;
+        }
+        .login-field label {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        .login-field input[type="text"] {
+            width: 100%;
+            min-height: 44px;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .login-field input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+        }
+        .login-error {
+            color: #ef4444;
+            font-size: 0.875rem;
+            margin-top: 0.35rem;
+        }
+        .login-btn {
+            width: 100%;
+            min-height: 44px;
+            padding: 0.625rem 1rem;
+            margin-top: 1rem;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 500;
+            transition: background 0.2s ease;
+        }
+        .login-btn:hover { background: var(--accent-hover); }
+        .login-btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+        }
+        .login-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .login-field input[type="text"],
+            .login-btn { transition: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <form class="login-card" method="POST" action="{{ url_for('login_submit') }}"
+              onsubmit="this.querySelector('.login-btn').disabled = true;">
+            <h1 class="login-card__title">Flat Finder</h1>
+            <div class="login-field">
+                <label for="username">Username</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    autocomplete="username"
+                    autofocus
+                    {% if error %}aria-describedby="username-error"{% endif %}
+                >
+                {% if error %}
+                <p id="username-error" class="login-error" role="alert">{{ error }}</p>
+                {% endif %}
+            </div>
+            <button type="submit" class="login-btn">Log in</button>
+        </form>
+    </div>
+</body>
+</html>

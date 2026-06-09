@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Flat Finder{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', path='favicon.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='v2.css') }}">
+    {% block head %}{% endblock %}
+    <style>
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-muted, #6b7280);
+        }
+        .nav-logout-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.8125rem;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-muted, #6b7280);
+            cursor: pointer;
+        }
+        .nav-logout-btn:hover {
+            background: var(--surface-hover, var(--surface));
+            color: var(--text);
+            border-color: var(--text-muted, #6b7280);
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav__inner">
+            <a class="nav__brand" href="{{ url_for('feed_page') }}">Flat Finder</a>
+            <div class="nav__links">
+                <a class="nav__link {% if '/listing' not in request.url.path %}nav__link--active{% endif %}"
+                   href="{{ url_for('feed_page') }}">Feed</a>
+                <a class="nav__link" href="{{ url_for('map_page') }}">Map</a>
+                <a class="nav__link" href="{{ url_for('settings_page') }}">Settings</a>
+            </div>
+            <div class="nav-user">
+                <span>{{ request.session.get("username", "") }}</span>
+                <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
+                    <button type="submit" class="nav-logout-btn">Logout</button>
+                </form>
+            </div>
+        </div>
+    </nav>
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+    <script src="{{ url_for('static', path='v2.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

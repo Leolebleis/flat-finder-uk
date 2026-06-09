@@ -1,5 +1,13 @@
 import pytest
+from fastapi.testclient import TestClient
 from flat_finder.database import Base
+
+# Import all ORM models so their table mappings are registered on Base.metadata
+# before create_all is called.
+import flat_finder.listings.persistence  # noqa: F401
+import flat_finder.pois.persistence  # noqa: F401
+import flat_finder.users.persistence  # noqa: F401
+import flat_finder.zones.persistence  # noqa: F401
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -17,3 +25,53 @@ def db_session(db_engine) -> Session:
     session = factory()
     yield session
     session.close()
+
+
+@pytest.fixture
+def app(db_engine):
+    """Create a test FastAPI app backed by a temporary test DB.
+
+    Bypasses the production lifespan (which tries to open config.DB_PATH) by
+    injecting engine + session_factory directly onto app.state before the
+    TestClient context manager starts the lifespan.  The test lifespan simply
+    uses whatever is already on app.state.
+    """
+    from collections.abc import AsyncIterator
+    from contextlib import asynccontextmanager
+
+    from fastapi import FastAPI
+
+    from flat_finder.api.app import create_app
+
+    @asynccontextmanager
+    async def test_lifespan(application: FastAPI) -> AsyncIterator[None]:  # noqa: RUF029
+        # engine + session_factory already injected below
+        yield
+
+    application = create_app()
+    # Swap in test lifespan before the TestClient enters it
+    application.router.lifespan_context = test_lifespan
+    application.state.engine = db_engine
+    application.state.session_factory = sessionmaker(bind=db_engine)
+    return application
+
+
+@pytest.fixture
+def client(app) -> TestClient:
+    """Unauthenticated test client."""
+    with TestClient(app, root_path="/flat", raise_server_exceptions=True) as c:
+        yield c
+
+
+@pytest.fixture
+def authed_client(app, db_session) -> TestClient:
+    """Test client logged in as 'leo'."""
+    from flat_finder.users.persistence import UserRepository
+
+    repo = UserRepository(db_session)
+    repo.create("leo")
+    db_session.commit()
+
+    with TestClient(app, root_path="/flat", raise_server_exceptions=True) as c:
+        c.post("/login", data={"username": "leo"})
+        yield c
