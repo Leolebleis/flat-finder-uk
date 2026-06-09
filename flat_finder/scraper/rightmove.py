@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from urllib.parse import urlencode
 
 import requests
+
 from flat_finder.scraping import HTTP_HEADERS, check_description, should_exclude_text
 
 SEARCH_URL = "https://www.rightmove.co.uk/property-to-rent/find.html"

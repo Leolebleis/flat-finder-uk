@@ -4,11 +4,9 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-
 from flat_finder.listings.persistence import ListingRepository
 from flat_finder.users.persistence import UserRepository
 from flat_finder.zones.persistence import ListingZoneRepository, ZoneRepository
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -153,7 +151,7 @@ class TestStateAPIUserScoping:
         assert amelie_resp.json()["favourite"] is False
 
     def test_state_update_returns_404_for_unknown_listing(
-        self, db_session, leo_client
+        self, db_session, leo_client  # noqa: ARG002
     ) -> None:
         """Given a listing does not exist
         When Leo tries to update its state

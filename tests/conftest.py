@@ -1,13 +1,18 @@
-import pytest
-from fastapi.testclient import TestClient
-from flat_finder.database import Base
-
 # Import all ORM models so their table mappings are registered on Base.metadata
 # before create_all is called.
-import flat_finder.listings.persistence  # noqa: F401
-import flat_finder.pois.persistence  # noqa: F401
-import flat_finder.users.persistence  # noqa: F401
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+import flat_finder.listings.persistence
+import flat_finder.pois.persistence
+import flat_finder.users.persistence
 import flat_finder.zones.persistence  # noqa: F401
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from flat_finder.api.app import create_app
+from flat_finder.database import Base
+from flat_finder.users.persistence import UserRepository
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -36,15 +41,9 @@ def app(db_engine):
     TestClient context manager starts the lifespan.  The test lifespan simply
     uses whatever is already on app.state.
     """
-    from collections.abc import AsyncIterator
-    from contextlib import asynccontextmanager
-
-    from fastapi import FastAPI
-
-    from flat_finder.api.app import create_app
 
     @asynccontextmanager
-    async def test_lifespan(application: FastAPI) -> AsyncIterator[None]:  # noqa: RUF029
+    async def test_lifespan(_app: FastAPI) -> AsyncIterator[None]:  # noqa: PT019
         # engine + session_factory already injected below
         yield
 
@@ -66,8 +65,6 @@ def client(app) -> TestClient:
 @pytest.fixture
 def authed_client(app, db_session) -> TestClient:
     """Test client logged in as 'leo'."""
-    from flat_finder.users.persistence import UserRepository
-
     repo = UserRepository(db_session)
     repo.create("leo")
     db_session.commit()

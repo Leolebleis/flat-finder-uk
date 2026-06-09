@@ -1,9 +1,9 @@
 import logging
 from pathlib import Path
 
-from sqlalchemy import event, create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 log = logging.getLogger(__name__)
 
@@ -12,8 +12,8 @@ class Base(DeclarativeBase):
     pass
 
 
-def _set_sqlite_pragmas(dbapi_conn, _connection_record):
-    cursor = dbapi_conn.cursor()
+def _set_sqlite_pragmas(dbapi_conn: object, _connection_record: object) -> None:
+    cursor = dbapi_conn.cursor()  # type: ignore[union-attr]
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA busy_timeout=5000")
     cursor.close()

@@ -1,3 +1,4 @@
+import datetime as dt
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -204,8 +205,6 @@ class ListingRepository:
 
     def archive_old(self, days: int) -> list[str]:
         """Move listings older than `days` to archive table. Returns list of archived IDs."""
-        import datetime as dt
-
         cutoff = datetime.now(UTC).replace(tzinfo=None) - dt.timedelta(days=days)
 
         old_rows = (

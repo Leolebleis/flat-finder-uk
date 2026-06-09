@@ -1,10 +1,8 @@
 """E2E tests for the settings page — ntfy topic and POI user scoping."""
 import pytest
 from fastapi.testclient import TestClient
-
-from flat_finder.users.persistence import UserRepository
 from flat_finder.pois.persistence import POIRepository
-
+from flat_finder.users.persistence import UserDB, UserRepository
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -43,7 +41,7 @@ class TestNtfySettings:
     As a user, I can configure my ntfy topic for flat alerts.
     """
 
-    def test_set_ntfy_topic(self, db_session, leo_client) -> None:
+    def test_set_ntfy_topic(self, db_session, leo_client) -> None:  # noqa: ARG002
         """Given Leo is on settings page
         When he submits a new ntfy topic
         Then his topic is saved and visible on the settings page.
@@ -70,14 +68,11 @@ class TestNtfySettings:
         assert resp.status_code == 200
         # Verify topic is cleared in DB
         leo = UserRepository(db_session).get_by_username("leo")
-        db_session.refresh(db_session.get(
-            __import__("flat_finder.users.persistence", fromlist=["UserDB"]).UserDB, leo.id
-        ))
-        from flat_finder.users.persistence import UserDB
+        db_session.refresh(db_session.get(UserDB, leo.id))
         user_db = db_session.get(UserDB, leo.id)
         assert user_db.ntfy_topic is None
 
-    def test_ntfy_topic_displayed_on_settings(self, db_session, leo_client) -> None:
+    def test_ntfy_topic_displayed_on_settings(self, db_session, leo_client) -> None:  # noqa: ARG002
         """Given Leo has a saved ntfy topic
         When he visits the settings page
         Then his topic is pre-filled in the form.
@@ -105,7 +100,7 @@ class TestPOIUserScoping:
     """
 
     def test_user_only_sees_own_pois(
-        self, db_session, leo_client, amelie_client
+        self, db_session, leo_client, amelie_client  # noqa: ARG002
     ) -> None:
         """Given Leo adds POI 'Leo Work' and Amelie adds POI 'Amelie HQ'
         When Leo views the settings page
@@ -144,7 +139,7 @@ class TestPOIUserScoping:
         assert "Library" in resp.text
 
     def test_delete_other_users_poi_returns_error(
-        self, db_session, leo_client, amelie_client
+        self, db_session, leo_client, amelie_client  # noqa: ARG002
     ) -> None:
         """Given Amelie has a POI
         When Leo tries to delete it

@@ -3,10 +3,8 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
-
 from flat_finder.users.persistence import UserRepository
 from flat_finder.zones.persistence import ZoneRepository
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,7 +61,7 @@ class TestZoneAPIUserScoping:
     """
 
     def test_get_zones_returns_only_own(
-        self, db_session, leo_client, amelie_client
+        self, db_session, leo_client, amelie_client  # noqa: ARG002
     ) -> None:
         """Given Leo has zone 'North' and Amelie has zone 'South'
         When Leo calls GET /api/zones
@@ -109,7 +107,7 @@ class TestZoneAPIUserScoping:
             assert zone_data["name"] == "My Zone"
 
     def test_delete_other_users_zone_fails(
-        self, db_session, leo_client, amelie_client
+        self, db_session, leo_client, amelie_client  # noqa: ARG002
     ) -> None:
         """Given Amelie has a zone
         When Leo tries to delete it
@@ -127,7 +125,7 @@ class TestZoneAPIUserScoping:
         assert resp.status_code == 404
 
     def test_update_other_users_zone_fails(
-        self, db_session, leo_client, amelie_client
+        self, db_session, leo_client, amelie_client  # noqa: ARG002
     ) -> None:
         """Given Amelie has a zone
         When Leo tries to update it via PUT

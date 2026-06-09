@@ -6,8 +6,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from flat_finder.geo import extract_coords_from_url
-from flat_finder.scraper.commute import tfl_journey_mins
 from sqlalchemy.orm import Session
 
 from flat_finder.api.dependencies import (
@@ -17,8 +15,10 @@ from flat_finder.api.dependencies import (
     get_zone_service,
 )
 from flat_finder.api.templating import templates
+from flat_finder.geo import extract_coords_from_url
 from flat_finder.pois.persistence import POICommuteRepository
 from flat_finder.pois.service import POIService
+from flat_finder.scraper.commute import tfl_journey_mins
 from flat_finder.users.service import UserService
 from flat_finder.zones.service import POI_COLORS, ZoneService
 

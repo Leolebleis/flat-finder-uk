@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import requests
+
 from scraper.commute import tfl_journey_mins
 
 

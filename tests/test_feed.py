@@ -4,12 +4,10 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from flat_finder.listings.persistence import ListingRepository
 from flat_finder.users.persistence import UserRepository
 from flat_finder.zones.persistence import ListingZoneRepository, ZoneRepository
-
+from sqlalchemy.orm import Session
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -103,7 +101,7 @@ class TestFeedUserScoping:
     """
 
     def test_user_sees_only_listings_in_their_zones(
-        self, app, db_session, leo_client, amelie_client
+        self, app, db_session, leo_client, amelie_client  # noqa: ARG002
     ) -> None:
         """Given Leo has zone A with listing 1, Amelie has zone B with listing 2
         When Leo views the feed
@@ -127,7 +125,7 @@ class TestFeedUserScoping:
         assert "Leo Flat" in resp.text
         assert "Amelie Flat" not in resp.text
 
-    def test_zone_filter_shows_user_zones(self, app, db_session, leo_client) -> None:
+    def test_zone_filter_shows_user_zones(self, app, db_session, leo_client) -> None:  # noqa: ARG002
         """Given Leo has two zones
         When he views the feed
         Then the zone filter shows his zone names.
@@ -142,7 +140,7 @@ class TestFeedUserScoping:
         assert "South London" in resp.text
 
     def test_favourite_state_independent_per_user(
-        self, app, db_session, leo_client, amelie_client
+        self, app, db_session, leo_client, amelie_client  # noqa: ARG002
     ) -> None:
         """Given a shared listing in both users' zones
         When Leo favourites it and Amelie views it
@@ -163,8 +161,8 @@ class TestFeedUserScoping:
         # Leo favourites the listing
         leo_client.post("/api/state/shared_1", json={"favourite": True})
 
-        # Check Leo sees it as favourite
-        resp = leo_client.get("/api/state/shared_1", follow_redirects=True)
+        # Check Leo sees it as favourite (side-effect: confirms endpoint responds)
+        leo_client.get("/api/state/shared_1", follow_redirects=True)
         # Verify via the state endpoint
         state_resp = leo_client.post("/api/state/shared_1", json={"favourite": True})
         assert state_resp.status_code == 200
@@ -184,7 +182,7 @@ class TestFeedUserScoping:
         assert resp.status_code == 200
         assert "No listings yet" in resp.text
 
-    def test_sort_options_work(self, app, db_session, leo_client) -> None:
+    def test_sort_options_work(self, app, db_session, leo_client) -> None:  # noqa: ARG002
         """Given Leo has listings in his zone
         When he requests different sort options
         Then the feed returns 200 for each.

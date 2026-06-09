@@ -1,6 +1,7 @@
 import pytest
-from scraper.rightmove import _extract_next_data, build_search_url, parse_rightmove_response
 from shared.scraping import check_description
+
+from scraper.rightmove import _extract_next_data, build_search_url, parse_rightmove_response
 
 
 def test_build_search_url_includes_parameters():

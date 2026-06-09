@@ -1,5 +1,5 @@
-from sqlalchemy import text
 from flat_finder.database import Base, get_engine, get_session
+from sqlalchemy import text
 
 
 class TestDatabaseEngine:

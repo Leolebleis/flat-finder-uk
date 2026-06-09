@@ -35,7 +35,7 @@ dev = [
 [tool.ruff]
 target-version = "py313"
 line-length = 120
-src = ["shared", "scraper", "ui", "tests"]
+src = ["flat_finder", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -55,7 +55,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["shared", "scraper", "ui"]
+source = ["flat_finder"]
 
 [tool.coverage.report]
 show_missing = true
@@ -66,5 +66,28 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["shared", "scraper", "ui"]
+packages = ["flat_finder"]
 exclude = ["**/Dockerfile", "**/requirements.txt"]
+
+[tool.importlinter]
+root_packages = ["flat_finder"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Domain models do not import infrastructure"
+type = "forbidden"
+source_modules = [
+    "flat_finder.listings.model",
+    "flat_finder.listings.dao",
+    "flat_finder.zones.model",
+    "flat_finder.zones.dao",
+    "flat_finder.pois.model",
+    "flat_finder.pois.dao",
+    "flat_finder.users.model",
+    "flat_finder.users.dao",
+]
+forbidden_modules = [
+    "flat_finder.api",
+    "flat_finder.database",
+    "sqlalchemy",
+]

@@ -5,6 +5,7 @@ from urllib.parse import quote_plus, urlencode
 import requests
 from bs4 import BeautifulSoup
 from bs4.element import Tag
+
 from flat_finder.scraping import HTTP_HEADERS, check_description, should_exclude_text
 
 BASE_URL = "https://www.openrent.co.uk/properties-to-rent"
