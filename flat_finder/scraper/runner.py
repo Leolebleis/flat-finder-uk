@@ -18,7 +18,7 @@ from flat_finder.scraper.commute import tfl_journey_mins
 from flat_finder.scraper.notifier import (
     format_email_html,
     format_failure_message,
-    format_ntfy_message,
+    format_ntfy_single,
     format_recovery_message,
     send_email,
     send_ntfy,
@@ -300,12 +300,10 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
                 user_new = [lst for lst in new_listings if lst["id"] in user_listing_ids]
                 if user_new:
                     user_pois = poi_repo.get_by_user(user.id)
-                    title, body = format_ntfy_message(
-                        user_new,
-                        [{"id": p.id, "name": p.name} for p in user_pois],
-                    )
-                    click_url = user_new[0].get("url")
-                    _notify_safe(send_ntfy, user.ntfy_topic, title, body, click_url=click_url)
+                    poi_dicts = [{"id": p.id, "name": p.name} for p in user_pois]
+                    for listing in user_new:
+                        title, body = format_ntfy_single(listing, poi_dicts)
+                        _notify_safe(send_ntfy, user.ntfy_topic, title, body, click_url=listing.get("url"))
 
             # Global email notification (all new listings, not per-user)
             if config.GMAIL_ADDRESS and config.GMAIL_APP_PASSWORD:

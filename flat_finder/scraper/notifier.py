@@ -7,29 +7,25 @@ from html import escape
 import requests
 
 
-def format_ntfy_message(listings: list[dict], pois: list[dict] | None = None) -> tuple[str, str]:
-    """Returns (title, body) for a bundled notification.
-    Title: "3 new flats found" / "1 new flat found"
-    Body: one line per listing with address + price + commute times.
-    """
-    count = len(listings)
-    title = f"{count} new flat{'s' if count != 1 else ''} found"
-    lines = []
-    for listing in listings:
-        address = listing.get("address", "Unknown")
-        price = listing.get("price_pcm")
-        price_str = f"£{price:,}" if price is not None else "Price unknown"
-        parts = [f"{address} - {price_str}"]
-        if pois and listing.get("poi_commutes"):
-            commute_parts = []
-            for poi in pois:
-                mins = listing["poi_commutes"].get(poi["id"])
-                if mins is not None:
-                    commute_parts.append(f"{mins}min to {poi['name']}")
-            if commute_parts:
-                parts.append(", ".join(commute_parts))
-        lines.append(" | ".join(parts))
-    body = "\n".join(lines)
+def format_ntfy_single(listing: dict, pois: list[dict] | None = None) -> tuple[str, str]:
+    """Returns (title, body) for a single listing notification."""
+    address = listing.get("address", "Unknown")
+    price = listing.get("price_pcm")
+    price_str = f"£{price:,}/mo" if price is not None else "Price unknown"
+    bedrooms = listing.get("bedrooms")
+    bed_str = f"{bedrooms} bed" if bedrooms else ""
+
+    title = f"{bed_str} — {price_str}".strip(" —") if bed_str else price_str
+    parts = [address]
+    if pois and listing.get("poi_commutes"):
+        commute_parts = []
+        for poi in pois:
+            mins = listing["poi_commutes"].get(poi["id"])
+            if mins is not None:
+                commute_parts.append(f"{mins}min to {poi['name']}")
+        if commute_parts:
+            parts.append(", ".join(commute_parts))
+    body = "\n".join(parts)
     return title, body
 
 
