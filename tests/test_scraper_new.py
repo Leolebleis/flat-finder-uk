@@ -82,9 +82,8 @@ def _create_user_with_zone(db_session, username: str, ntfy_topic: str | None = N
     zone_repo = ZoneRepository(db_session)
 
     user = user_repo.create(username)
-    if ntfy_topic:
-        user_repo.update_ntfy_topic(user.id, ntfy_topic)
-        user = user_repo.get_by_id(user.id)
+    user_repo.update_ntfy_topic(user.id, ntfy_topic)
+    user = user_repo.get_by_id(user.id)
 
     zone = zone_repo.create(
         user_id=user.id,

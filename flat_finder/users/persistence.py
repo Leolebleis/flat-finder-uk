@@ -1,4 +1,5 @@
 import logging
+import secrets
 from datetime import UTC, datetime
 
 from sqlalchemy import Integer, String, Text
@@ -27,7 +28,12 @@ class UserRepository:
         self._session = session
 
     def create(self, username: str) -> User:
-        db_user = UserDB(username=username, max_rent_pcm=2200, created_at=datetime.now(UTC).isoformat())
+        db_user = UserDB(
+            username=username,
+            ntfy_topic=f"flat-finder-{secrets.token_hex(4)}",
+            max_rent_pcm=2200,
+            created_at=datetime.now(UTC).isoformat(),
+        )
         self._session.add(db_user)
         self._session.flush()
         log.info("Created user: %s (id=%d)", username, db_user.id)

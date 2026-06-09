@@ -71,7 +71,8 @@ class TestUserRepository:
         assert retrieved is not None
         assert retrieved.id == user.id
         assert retrieved.username == "alice"
-        assert retrieved.ntfy_topic is None
+        assert retrieved.ntfy_topic is not None
+        assert retrieved.ntfy_topic.startswith("flat-finder-")
 
     def test_create_user_and_retrieve_by_id(self, db_session):
         """Given a created user
@@ -133,10 +134,11 @@ class TestUserRepository:
         repo = UserRepository(db_session)
         u1 = repo.create("user1")
         u2 = repo.create("user2")
-        repo.create("user3")
+        u3 = repo.create("user3")
 
         repo.update_ntfy_topic(u1.id, "topic-1")
         repo.update_ntfy_topic(u2.id, "topic-2")
+        repo.update_ntfy_topic(u3.id, None)
 
         results = repo.get_all_with_ntfy()
 
