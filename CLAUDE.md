@@ -11,7 +11,7 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 - Zones live in the `zones` table (drawable via Settings page)
 
 ## Components
-- **scraper/** -- Rightmove + OpenRent scrapers, iterates zones, fetches TfL commute times for all POIs for new listings. Cross-source dedup by address+price+bedrooms. Runs every 15 min.
+- **scraper/** -- Rightmove + OpenRent scrapers, iterates zones, fetches commute times (Transitous API) for all POIs for new listings. Cross-source dedup by address+price+bedrooms. Runs every 15 min.
 - **ui/** -- FastAPI + Jinja2. Feed with zone filter, weighted scoring, seen/favourite/notes, label overrides. Dark mode via prefers-color-scheme.
 - **shared/models.py** -- SQLite schema (listings, pois, poi_commutes), migrations, insert/query helpers
 - **shared/config.py** -- env var config (DB_PATH, NTFY_TOPIC, rent/bedroom bounds)
@@ -39,7 +39,7 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 - UI logs: `docker logs flat-finder`
 
 ## Features
-- **Dynamic POIs**: User-configurable Places of Interest via Settings page. Paste a Google Maps link to add. Commute times fetched via TfL Journey Planner. Backfill runs automatically.
+- **Dynamic POIs**: User-configurable Places of Interest via Settings page. Paste a Google Maps link to add. Commute times fetched via Transitous API (UK-wide public transit, replaces TfL which only covered London). Backfill runs automatically.
 - **Weighted scoring**: Combining commute times across all POIs. Independent weight sliders per POI, normalized automatically. Score badge + weight sliders always visible. Client-side recalculation without page reload. Min-max normalization to 0-100.
 - **Label overrides**: Feature pills (dishwasher/washer/outdoor) clickable on detail page, cycling yes->no->unknown->revert. Stored as nullable columns in user_state. `model_fields_set` distinguishes "not sent" from "sent as null".
 - **Cross-source dedup**: Scraper normalizes addresses (strip punctuation, remove "London", collapse whitespace) and fingerprints on (address, price, bedrooms).
@@ -63,5 +63,6 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 - **Docker build context**: docker-compose.yml is in this repo. Changes must be on `main` for rebuild to pick them up.
 - **DB schema ownership**: All schemas live in `shared/models.py::init_db` (listings, scraper_state, pois, poi_commutes, zones, user_state). Both scraper + UI containers call `init_db` on startup -- safe with WAL. Do NOT declare schemas in `ui/` or `scraper/`; the scraper writes to UI-owned tables (e.g. prune-orphan cleanup) and that only works because `init_db` is shared.
 - **Column migrations**: Use `_ensure_columns(conn, table, [(col, type)])` (PRAGMA table_info guard). Avoid `try/except sqlite3.OperationalError: pass` — it runs the ALTER on every startup.
-- **TfL rate limiting**: Backfill loops need `time.sleep(0.5)` between API calls. Without throttling, TfL returns 429 after ~50 requests.
-- **TfL commute includes walking**: Journey Planner returns total door-to-door time including walk to/from stations.
+- **Commute API rate limiting**: Backfill loops need `time.sleep(0.5)` between API calls. Transitous is community-run — be respectful of their resources.
+- **Commute times include walking**: Transitous returns total door-to-door time including walk to/from stations.
+- **CommuteClient protocol**: `flat_finder/scraper/commute.py` defines a `CommuteClient` protocol. `TransitousCommuteClient` is the concrete implementation. Swap providers by implementing the protocol.

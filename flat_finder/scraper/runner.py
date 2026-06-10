@@ -23,6 +23,7 @@ from flat_finder.scraper.notifier import (
 )
 from flat_finder.scraper.openrent import fetch_openrent
 from flat_finder.scraper.rightmove import fetch_rightmove
+from flat_finder.scraper.transitous import TransitousCommuteClient
 from flat_finder.users.persistence import UserRepository
 from flat_finder.zones.persistence import ListingZoneRepository, ZoneRepository
 
@@ -223,12 +224,13 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             if is_new:
                 new_listings.append(listing)
 
-        # Release the write lock before the slow TfL phase — holding one
+        # Release the write lock before the slow commute phase — holding one
         # transaction across minutes of network I/O starves UI writes past
         # their busy_timeout ("database is locked" 500s).
         session.commit()
 
         pois = poi_repo.get_all()
+        commute_client = TransitousCommuteClient()
 
         # Fetch commute times for new listings (per POI), committing per upsert
         if new_listings and pois:
@@ -238,14 +240,14 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
                 if listing.get("latitude") and listing.get("longitude")
             ]
             for poi in pois:
-                fetch_commutes_for_listings(poi_commute_repo, poi, rows, after_upsert=session.commit)
+                fetch_commutes_for_listings(poi_commute_repo, poi, rows, commute_client, after_upsert=session.commit)
 
         # Backfill: any listings still missing commute data for any POI
         for poi in pois:
             missing = poi_commute_repo.get_listings_missing_poi(poi.id)
             if missing:
                 log.info("Backfilling '%s' commute for %d listings", poi.name, len(missing))
-                fetch_commutes_for_listings(poi_commute_repo, poi, missing, after_upsert=session.commit)
+                fetch_commutes_for_listings(poi_commute_repo, poi, missing, commute_client, after_upsert=session.commit)
 
         # Attach poi_commutes to new listings for notification (one batched query)
         if new_listings:
