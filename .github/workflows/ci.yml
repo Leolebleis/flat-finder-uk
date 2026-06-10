@@ -13,8 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
-      - run: uv run ruff check shared/ scraper/ ui/ tests/
-      - run: uv run ruff format --check shared/ scraper/ ui/ tests/
+      - run: uv run ruff check flat_finder/ tests/
+      - run: uv run ruff format --check flat_finder/ tests/
 
   type-check:
     runs-on: ubuntu-latest
@@ -22,7 +22,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
-      - run: uv run ty check shared/ scraper/ ui/
+      - run: uv run ty check flat_finder/
+
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - run: uv run lint-imports
 
   test:
     runs-on: ubuntu-latest
@@ -30,8 +38,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
-      - run: uv run pytest --cov --cov-report=xml -v
+      - run: uv run pytest --ignore=tests/e2e --cov --cov-report=xml -v
       - uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - run: uv run playwright install chromium --with-deps
+      - run: uv run pytest tests/e2e/ -v --tracing=retain-on-failure
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

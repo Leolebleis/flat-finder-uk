@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+{% block title %}Settings - Flat Finder{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.19.3/dist/leaflet-geoman.css" />
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.19.3/dist/leaflet-geoman.min.js"></script>
+{% endblock %}
+{% block content %}
+
+<div class="settings">
+
+    <h1 class="settings__title">Notifications</h1>
+    <p class="settings__desc">Receive alerts when new listings are found matching your zones.</p>
+
+    <div class="settings__ntfy" id="ntfy-section">
+        {% if ntfy_topic %}
+        <div class="settings__ntfy-display" id="ntfy-display">
+            <div class="settings__ntfy-current">
+                <span class="settings__ntfy-label">ntfy topic</span>
+                <span class="settings__ntfy-value" id="ntfy-value">{{ ntfy_topic }}</span>
+                <small class="form-hint">
+                    Subscribe at
+                    <a href="https://ntfy.sh/{{ ntfy_topic }}" target="_blank" rel="noopener">ntfy.sh/{{ ntfy_topic }}</a>
+                </small>
+            </div>
+            <button type="button" class="btn-action settings__copy-btn" id="ntfy-copy-btn" title="Copy topic">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span id="ntfy-copy-label">Copy</span>
+            </button>
+            <button type="button" class="btn-action" id="ntfy-edit-btn">Edit</button>
+        </div>
+        {% endif %}
+        <form class="settings__form" id="ntfy-form" method="post" action="{{ request.url_for('update_ntfy') }}"
+              {% if ntfy_topic %}style="display:none"{% endif %}>
+            <div class="settings__field settings__field--wide">
+                <label for="ntfy_topic">ntfy topic</label>
+                <input type="text" id="ntfy_topic" name="topic"
+                       value="{{ ntfy_topic or '' }}"
+                       placeholder="my-flat-alerts">
+                <small class="form-hint">Notifications sent to https://ntfy.sh/your-topic</small>
+            </div>
+            <div class="settings__ntfy-actions">
+                <button type="submit" class="btn-action btn-action--primary">Save</button>
+                {% if ntfy_topic %}
+                <button type="button" class="btn-action" id="ntfy-cancel-btn">Cancel</button>
+                {% endif %}
+            </div>
+        </form>
+        {% if not ntfy_topic %}
+        <p class="settings__empty">No notification topic set. Add one to receive alerts for new listings.</p>
+        {% endif %}
+    </div>
+
+    <h1 class="settings__title settings__title--section">Search Criteria</h1>
+    <p class="settings__desc">Set your price range and bedroom preferences. The scraper uses the widest range across all users.</p>
+
+    <div class="settings__search" id="search-section">
+        {% if max_rent_pcm or min_bedrooms or max_bedrooms %}
+        <div class="settings__ntfy-display" id="search-display">
+            <div class="settings__ntfy-current">
+                <span class="settings__ntfy-label">Search parameters</span>
+                <span class="settings__ntfy-value">
+                    £{{ "{:,}".format(max_rent_pcm) }}/mo max
+                    {% if min_bedrooms or max_bedrooms %} · {{ min_bedrooms or 'any' }}–{{ max_bedrooms or 'any' }} bed{% endif %}
+                </span>
+            </div>
+            <button type="button" class="btn-action" id="search-edit-btn">Edit</button>
+        </div>
+        {% endif %}
+        <form class="settings__form" id="search-form" method="post" action="{{ request.url_for('update_search_params') }}"
+              {% if max_rent_pcm or min_bedrooms or max_bedrooms %}style="display:none"{% endif %}>
+            <div class="settings__field">
+                <label for="max_rent_pcm">Max rent (£/mo) *</label>
+                <input type="number" id="max_rent_pcm" name="max_rent_pcm"
+                       value="{{ max_rent_pcm or '' }}" placeholder="2200" min="100" step="50" required>
+            </div>
+            <div class="settings__field">
+                <label for="min_bedrooms">Min bedrooms</label>
+                <input type="number" id="min_bedrooms" name="min_bedrooms"
+                       value="{{ min_bedrooms or '' }}" placeholder="Any" min="0" max="10">
+            </div>
+            <div class="settings__field">
+                <label for="max_bedrooms">Max bedrooms</label>
+                <input type="number" id="max_bedrooms" name="max_bedrooms"
+                       value="{{ max_bedrooms or '' }}" placeholder="Any" min="0" max="10">
+            </div>
+            <div class="settings__ntfy-actions">
+                <button type="submit" class="btn-action btn-action--primary">Save</button>
+                {% if max_rent_pcm or min_bedrooms or max_bedrooms %}
+                <button type="button" class="btn-action" id="search-cancel-btn">Cancel</button>
+                {% endif %}
+            </div>
+        </form>
+        {% if not max_rent_pcm and not min_bedrooms and not max_bedrooms %}
+        <p class="settings__empty">No search criteria set. Using system defaults.</p>
+        {% endif %}
+    </div>
+
+    <h1 class="settings__title settings__title--section">Places of Interest</h1>
+    <p class="settings__desc">Add locations to track commute times from each listing. Paste a Google Maps link to set the coordinates.</p>
+
+    <form class="settings__form" method="post" action="{{ request.url_for('add_poi') }}">
+        <div class="settings__field">
+            <label for="poi-name">Name</label>
+            <input type="text" id="poi-name" name="name" placeholder="e.g. Office, Gym" required>
+        </div>
+        <div class="settings__field settings__field--wide">
+            <label for="poi-url">Google Maps link</label>
+            <input type="url" id="poi-url" name="maps_url" placeholder="https://www.google.com/maps/..." required>
+        </div>
+        <button type="submit" class="btn-action btn-action--primary">Add</button>
+    </form>
+
+    {% if pois %}
+    <div class="settings__list">
+        {% for poi in pois %}
+        <div class="settings__poi" data-poi-id="{{ poi.id }}">
+            <span class="settings__poi-swatch" style="background: {{ poi.color.color }}"></span>
+            <span class="settings__poi-name">{{ poi.name }}</span>
+            <span class="settings__poi-coords">{{ "%.4f"|format(poi.lat) }}, {{ "%.4f"|format(poi.lng) }}</span>
+            <button class="settings__poi-delete" data-action="delete-poi" data-id="{{ poi.id }}" title="Remove">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="settings__empty">No places added yet. Add one above to start tracking commute times.</p>
+    {% endif %}
+
+    <h1 class="settings__title settings__title--zones">Search Zones</h1>
+    <p class="settings__desc">Draw polygons on the map to define where to search for listings. Results outside your drawn zones are filtered out.</p>
+
+    <div class="settings__zone-list" id="zone-list">
+        {% for zone in zones %}
+        <div class="settings__zone" data-zone-id="{{ zone.id }}">
+            <span class="settings__zone-swatch" style="background: {{ zone.color.color }}"></span>
+            <div class="settings__zone-info">
+                <span class="settings__zone-name">{{ zone.name }}</span>
+                <span class="settings__zone-meta">{{ zone.openrent_term or 'pending' }} · {{ zone.rightmove_id or 'pending' }}</span>
+            </div>
+            <button class="settings__zone-edit" data-action="edit-zone" data-id="{{ zone.id }}" title="Edit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button class="settings__zone-delete" data-action="delete-zone" data-id="{{ zone.id }}" title="Remove">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% if not zones %}
+    <p class="settings__empty" id="zone-empty">No search zones defined. Add one below to start filtering listings by area.</p>
+    {% endif %}
+
+    <button class="btn-action btn-action--primary settings__add-zone" id="add-zone-btn" type="button">Add Zone</button>
+
+    <div class="zone-editor" id="zone-editor" style="display:none;">
+        <div class="zone-editor__header">
+            <div class="settings__field">
+                <label for="zone-name">Zone name</label>
+                <input type="text" id="zone-name" placeholder="e.g. Search area" required>
+            </div>
+            <div class="zone-editor__actions">
+                <button type="button" class="btn-action" id="zone-cancel-btn">Cancel</button>
+                <button type="button" class="btn-action btn-action--primary" id="zone-save-btn" disabled>Save</button>
+            </div>
+        </div>
+        <div id="zone-map" class="zone-editor__map"></div>
+        <p class="zone-editor__hint">Click on the map to place vertices. Click the first vertex to close the shape.</p>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    "use strict";
+
+    // --- ntfy edit toggle ---
+    var ntfyDisplay = document.getElementById("ntfy-display");
+    var ntfyForm = document.getElementById("ntfy-form");
+    var ntfyEditBtn = document.getElementById("ntfy-edit-btn");
+    var ntfyCancelBtn = document.getElementById("ntfy-cancel-btn");
+
+    var ntfyCopyBtn = document.getElementById("ntfy-copy-btn");
+    var ntfyCopyLabel = document.getElementById("ntfy-copy-label");
+    if (ntfyCopyBtn) {
+        ntfyCopyBtn.addEventListener("click", function() {
+            var topic = document.getElementById("ntfy-value").textContent.trim();
+            navigator.clipboard.writeText(topic).then(function() {
+                ntfyCopyLabel.textContent = "Copied";
+                setTimeout(function() { ntfyCopyLabel.textContent = "Copy"; }, 1500);
+            });
+        });
+    }
+
+    if (ntfyEditBtn) {
+        ntfyEditBtn.addEventListener("click", function() {
+            ntfyDisplay.style.display = "none";
+            ntfyForm.style.display = "";
+            document.getElementById("ntfy_topic").focus();
+        });
+    }
+    if (ntfyCancelBtn) {
+        ntfyCancelBtn.addEventListener("click", function() {
+            ntfyForm.style.display = "none";
+            ntfyDisplay.style.display = "";
+        });
+    }
+
+    // --- search params edit toggle ---
+    var searchDisplay = document.getElementById("search-display");
+    var searchForm = document.getElementById("search-form");
+    var searchEditBtn = document.getElementById("search-edit-btn");
+    var searchCancelBtn = document.getElementById("search-cancel-btn");
+
+    if (searchEditBtn) {
+        searchEditBtn.addEventListener("click", function() {
+            searchDisplay.style.display = "none";
+            searchForm.style.display = "";
+            document.getElementById("max_rent_pcm").focus();
+        });
+    }
+    if (searchCancelBtn) {
+        searchCancelBtn.addEventListener("click", function() {
+            searchForm.style.display = "none";
+            searchDisplay.style.display = "";
+        });
+    }
+
+    var zoneMap = null;
+    var drawnLayer = null;
+    var editingZoneId = null;
+    var existingZoneLayers = [];
+
+    var editorEl = document.getElementById("zone-editor");
+    var addBtn = document.getElementById("add-zone-btn");
+    var saveBtn = document.getElementById("zone-save-btn");
+    var cancelBtn = document.getElementById("zone-cancel-btn");
+    var nameInput = document.getElementById("zone-name");
+    var zoneList = document.getElementById("zone-list");
+    var zoneEmpty = document.getElementById("zone-empty");
+
+    // Color palette injected from Python (single source of truth)
+    var ZONE_COLORS = {{ poi_colors | tojson }};
+
+    function initMap() {
+        if (zoneMap) return;
+        zoneMap = L.map("zone-map").setView([51.51, -0.13], 12);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors",
+        }).addTo(zoneMap);
+
+        // Load existing zones as non-editable layers
+        loadExistingZones();
+
+        // Enable polygon drawing
+        zoneMap.pm.addControls({
+            position: "topleft",
+            drawCircle: false,
+            drawCircleMarker: false,
+            drawMarker: false,
+            drawPolyline: false,
+            drawRectangle: false,
+            drawText: false,
+            editMode: false,
+            dragMode: false,
+            cutPolygon: false,
+            removalMode: false,
+            rotateMode: false,
+        });
+
+        zoneMap.on("pm:create", function(e) {
+            // Only allow one polygon at a time
+            if (drawnLayer) {
+                zoneMap.removeLayer(drawnLayer);
+            }
+            drawnLayer = e.layer;
+            saveBtn.disabled = false;
+            // Disable further drawing
+            zoneMap.pm.disableDraw();
+        });
+    }
+
+    function loadExistingZones() {
+        existingZoneLayers.forEach(function(l) { zoneMap.removeLayer(l); });
+        existingZoneLayers = [];
+        fetch("/flat/api/zones")
+            .then(function(r) { return r.json(); })
+            .then(function(zones) {
+                zones.forEach(function(z) {
+                    if (z.id === editingZoneId) return;
+                    var geojson = JSON.parse(z.geometry);
+                    var color = z.color ? z.color.color : "#0f766e";
+                    var layer = L.geoJSON(geojson, {
+                        style: { color: color, weight: 2, fillColor: color, fillOpacity: 0.15 }
+                    });
+                    layer.bindTooltip(z.name, { permanent: true, direction: "center", className: "zone-map-label" });
+                    layer.addTo(zoneMap);
+                    existingZoneLayers.push(layer);
+                });
+            });
+    }
+
+    function openEditor(zoneData) {
+        editorEl.style.display = "block";
+        addBtn.style.display = "none";
+        saveBtn.disabled = true;
+        drawnLayer = null;
+
+        setTimeout(function() {
+            initMap();
+            zoneMap.invalidateSize();
+            setTimeout(function() {
+                editorEl.scrollIntoView({ behavior: "instant", block: "start" });
+            }, 200);
+
+            if (zoneData) {
+                // Edit mode: load existing polygon
+                editingZoneId = zoneData.id;
+                nameInput.value = zoneData.name;
+                var geojson = JSON.parse(zoneData.geometry);
+                drawnLayer = L.geoJSON(geojson, {
+                    style: { color: "#0f766e", weight: 2, fillColor: "#0f766e", fillOpacity: 0.2 }
+                }).addTo(zoneMap);
+                // Fit map to polygon
+                zoneMap.fitBounds(drawnLayer.getBounds(), { padding: [40, 40] });
+                // Enable editing on the layer
+                drawnLayer.eachLayer(function(l) { l.pm.enable(); });
+                saveBtn.disabled = false;
+                // Reload other zones (excluding this one)
+                loadExistingZones();
+            } else {
+                editingZoneId = null;
+                nameInput.value = "";
+                loadExistingZones();
+                // Start polygon draw mode
+                zoneMap.pm.enableDraw("Polygon", { snappable: true });
+            }
+        }, 50);
+    }
+
+    function closeEditor() {
+        editorEl.style.display = "none";
+        addBtn.style.display = "";
+        if (drawnLayer) {
+            zoneMap.removeLayer(drawnLayer);
+            drawnLayer = null;
+        }
+        editingZoneId = null;
+        nameInput.value = "";
+        zoneMap.pm.disableDraw();
+    }
+
+    function getDrawnGeoJSON() {
+        if (!drawnLayer) return null;
+        // drawnLayer might be a GeoJSON FeatureGroup (from edit) or a single layer (from draw)
+        if (typeof drawnLayer.toGeoJSON === "function") {
+            var gj = drawnLayer.toGeoJSON();
+            // Handle FeatureCollection (from L.geoJSON)
+            if (gj.type === "FeatureCollection" && gj.features.length > 0) {
+                return gj.features[0].geometry;
+            }
+            if (gj.type === "Feature") return gj.geometry;
+            return gj;
+        }
+        return null;
+    }
+
+    addBtn.addEventListener("click", function() {
+        openEditor(null);
+    });
+
+    cancelBtn.addEventListener("click", function() {
+        closeEditor();
+    });
+
+    saveBtn.addEventListener("click", async function() {
+        var name = nameInput.value.trim();
+        if (!name) { nameInput.focus(); return; }
+        var geometry = getDrawnGeoJSON();
+        if (!geometry) return;
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+
+        var url = editingZoneId ? "/flat/api/zones/" + editingZoneId : "/flat/api/zones";
+        var method = editingZoneId ? "PUT" : "POST";
+
+        try {
+            var resp = await fetch(url, {
+                method: method,
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ name: name, geometry: geometry }),
+            });
+            if (resp.ok) {
+                // Reload page to show updated zone list
+                window.location.reload();
+            } else {
+                var err = await resp.json();
+                alert("Error: " + (err.detail || "Failed to save zone"));
+            }
+        } catch(e) {
+            alert("Network error: " + e.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Save";
+        }
+    });
+
+    // Delete zone handler
+    document.querySelectorAll("[data-action='delete-zone']").forEach(function(btn) {
+        btn.addEventListener("click", async function() {
+            var id = btn.dataset.id;
+            var resp = await fetch("/flat/api/zones/" + id, { method: "DELETE" });
+            if (resp.ok) {
+                btn.closest(".settings__zone").remove();
+                var remaining = document.querySelectorAll(".settings__zone");
+                if (remaining.length === 0 && zoneEmpty) {
+                    zoneEmpty.style.display = "";
+                } else if (remaining.length === 0) {
+                    var p = document.createElement("p");
+                    p.className = "settings__empty";
+                    p.id = "zone-empty";
+                    p.textContent = "No search zones defined. Add one below to start filtering listings by area.";
+                    zoneList.after(p);
+                }
+            }
+        });
+    });
+
+    // Edit zone handler
+    document.querySelectorAll("[data-action='edit-zone']").forEach(function(btn) {
+        btn.addEventListener("click", async function() {
+            var id = parseInt(btn.dataset.id);
+            var resp = await fetch("/flat/api/zones");
+            if (!resp.ok) return;
+            var zones = await resp.json();
+            var zone = zones.find(function(z) { return z.id === id; });
+            if (zone) openEditor(zone);
+        });
+    });
+
+})();
+</script>
+{% endblock %}

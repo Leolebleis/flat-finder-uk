@@ -1,0 +1,78 @@
+"""E2E test fixtures: live uvicorn server + shared login helper."""
+
+from __future__ import annotations
+
+import multiprocessing
+import os
+import time
+
+import flat_finder.persistence  # noqa: F401 — registers ORM models on Base.metadata
+import httpx
+import pytest
+from flat_finder.database import Base, get_engine
+
+
+def _run_server(db_path: str, secret_key: str) -> None:
+    """Entry point for the server subprocess (runs in a 'spawn' child process)."""
+    os.environ["FLAT_FINDER_DB"] = db_path
+    os.environ["SECRET_KEY"] = secret_key
+
+    import uvicorn  # noqa: PLC0415
+
+    uvicorn.run("flat_finder.api.app:app", host="127.0.0.1", port=8765, log_level="warning")
+
+
+@pytest.fixture(scope="session")
+def live_server(tmp_path_factory):
+    """Start a real uvicorn server with a fresh DB for the entire E2E session."""
+    db_path = tmp_path_factory.mktemp("e2e") / "test.db"
+
+    # Create the schema up front — in production this is Alembic's job,
+    # which runs before the app starts.
+    engine = get_engine(db_path)
+    Base.metadata.create_all(engine)
+    engine.dispose()
+
+    os.environ["FLAT_FINDER_DB"] = str(db_path)
+    os.environ["SECRET_KEY"] = "e2e-test-secret"  # noqa: S105
+
+    ctx = multiprocessing.get_context("spawn")
+    proc = ctx.Process(target=_run_server, args=(str(db_path), "e2e-test-secret"), daemon=True)
+    proc.start()
+
+    # Wait for server to be ready (up to 5 s)
+    for _ in range(50):
+        try:
+            httpx.get("http://127.0.0.1:8765/flat/login", timeout=1)
+            break
+        except (httpx.ConnectError, httpx.TimeoutException):
+            time.sleep(0.1)
+    else:
+        proc.kill()
+        msg = "Live server failed to start within 5 seconds"
+        raise RuntimeError(msg)
+
+    yield "http://127.0.0.1:8765/flat"
+    proc.kill()
+
+
+@pytest.fixture
+def app_url(live_server):
+    """Base URL for page.goto() calls — includes the /flat root_path."""
+    return live_server
+
+
+def login(page, app_url: str, username: str) -> None:
+    """Log in as *username*. Creates the user automatically on first login."""
+    page.goto(f"{app_url}/login")
+    page.fill("input[name='username']", username)
+    page.click("button[type='submit']")
+    page.wait_for_url(lambda url: "/login" not in url, timeout=5000)
+    page.wait_for_load_state("domcontentloaded")
+
+
+@pytest.fixture
+def logged_in_page(page, app_url):
+    """A page already logged in as 'e2e-default'."""
+    login(page, app_url, "e2e-default")
+    return page
