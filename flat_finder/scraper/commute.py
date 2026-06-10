@@ -16,9 +16,7 @@ RATE_LIMIT_SLEEP_S = 0.5
 class CommuteClient(Protocol):
     """Facade: resolve transit commute time between two coordinates."""
 
-    def journey_mins(
-        self, from_lat: float, from_lng: float, to_lat: float, to_lng: float
-    ) -> int | None:
+    def journey_mins(self, from_lat: float, from_lng: float, to_lat: float, to_lng: float) -> int | None:
         """Return shortest journey in minutes.
 
         Returns NO_JOURNEY (-1) when no route exists (permanent),

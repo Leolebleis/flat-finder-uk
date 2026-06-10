@@ -31,9 +31,7 @@ def _next_weekday_0830() -> str:
 class TransitousCommuteClient:
     """Concrete CommuteClient backed by the Transitous public API."""
 
-    def journey_mins(
-        self, from_lat: float, from_lng: float, to_lat: float, to_lng: float
-    ) -> int | None:
+    def journey_mins(self, from_lat: float, from_lng: float, to_lat: float, to_lng: float) -> int | None:
         try:
             resp = requests.get(
                 TRANSITOUS_API,
@@ -51,14 +49,20 @@ class TransitousCommuteClient:
             if not itineraries:
                 log.info(
                     "Transitous: no itineraries from %s,%s to %s,%s",
-                    from_lat, from_lng, to_lat, to_lng,
+                    from_lat,
+                    from_lng,
+                    to_lat,
+                    to_lng,
                 )
                 return NO_JOURNEY
             return min(it["duration"] for it in itineraries) // 60
         except requests.HTTPError:
             log.warning(
                 "Transitous HTTP error for %s,%s -> %s,%s",
-                from_lat, from_lng, to_lat, to_lng,
+                from_lat,
+                from_lng,
+                to_lat,
+                to_lng,
                 exc_info=True,
             )
             return None
