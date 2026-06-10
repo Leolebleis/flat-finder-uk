@@ -2,26 +2,23 @@
 
 from __future__ import annotations
 
+import multiprocessing
 import os
 import time
-from multiprocessing import Process
 
 import flat_finder.persistence  # noqa: F401 — registers ORM models on Base.metadata
 import httpx
 import pytest
-import uvicorn
 from flat_finder.database import Base, get_engine
 
 
 def _run_server(db_path: str, secret_key: str) -> None:
-    """Entry point for the server subprocess."""
+    """Entry point for the server subprocess (runs in a 'spawn' child process)."""
     os.environ["FLAT_FINDER_DB"] = db_path
     os.environ["SECRET_KEY"] = secret_key
-    import importlib  # noqa: PLC0415
 
-    import flat_finder.config  # noqa: PLC0415
+    import uvicorn  # noqa: PLC0415
 
-    importlib.reload(flat_finder.config)
     uvicorn.run("flat_finder.api.app:app", host="127.0.0.1", port=8765, log_level="warning")
 
 
@@ -36,11 +33,11 @@ def live_server(tmp_path_factory):
     Base.metadata.create_all(engine)
     engine.dispose()
 
-    # Set env vars before spawning so the child process inherits them
     os.environ["FLAT_FINDER_DB"] = str(db_path)
     os.environ["SECRET_KEY"] = "e2e-test-secret"  # noqa: S105
 
-    proc = Process(target=_run_server, args=(str(db_path), "e2e-test-secret"), daemon=True)
+    ctx = multiprocessing.get_context("spawn")
+    proc = ctx.Process(target=_run_server, args=(str(db_path), "e2e-test-secret"), daemon=True)
     proc.start()
 
     # Wait for server to be ready (up to 5 s)
@@ -70,8 +67,8 @@ def login(page, app_url: str, username: str) -> None:
     page.goto(f"{app_url}/login")
     page.fill("input[name='username']", username)
     page.click("button[type='submit']")
-    # Wait for the redirect to complete (away from /login)
     page.wait_for_url(lambda url: "/login" not in url, timeout=5000)
+    page.wait_for_load_state("domcontentloaded")
 
 
 @pytest.fixture
