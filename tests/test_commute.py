@@ -20,6 +20,19 @@ def _http_error(status: int) -> requests.HTTPError:
     return requests.HTTPError(response=response)
 
 
+def _ok(itineraries: list[dict]) -> Mock:
+    resp = Mock()
+    resp.raise_for_status.return_value = None
+    resp.json.return_value = {"itineraries": itineraries}
+    return resp
+
+
+def _err(exc: Exception) -> Mock:
+    resp = Mock()
+    resp.raise_for_status.side_effect = exc
+    return resp
+
+
 class TestTransitousCommuteClient:
     """Feature: Transitous API returns journey minutes or failure sentinels"""
 
@@ -28,38 +41,61 @@ class TestTransitousCommuteClient:
         When journey_mins is called
         Then it returns the shortest duration in minutes.
         """
-        resp = Mock()
-        resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "itineraries": [
-                {"duration": 5940},
-                {"duration": 7200},
-            ]
-        }
+        resp = _ok([{"duration": 5940}, {"duration": 7200}])
         with patch("flat_finder.scraper.transitous.requests.get", return_value=resp):
             client = TransitousCommuteClient()
             assert client.journey_mins(50.82, -0.14, 51.54, -0.17) == 99
 
-    def test_empty_itineraries_returns_no_journey(self):
-        """Given Transitous returns an empty itinerary list
+    def test_all_origins_empty_returns_no_journey(self):
+        """Given the exact origin AND every nudged origin return no itineraries
         When journey_mins is called
-        Then it returns NO_JOURNEY (permanent — no route exists).
+        Then it returns NO_JOURNEY (genuinely unroutable).
         """
-        resp = Mock()
-        resp.raise_for_status.return_value = None
-        resp.json.return_value = {"itineraries": []}
-        with patch("flat_finder.scraper.transitous.requests.get", return_value=resp):
+        with (
+            patch("flat_finder.scraper.transitous.requests.get", return_value=_ok([])),
+            patch("flat_finder.scraper.transitous.time.sleep"),
+        ):
             client = TransitousCommuteClient()
             assert client.journey_mins(50.82, -0.14, 51.54, -0.17) == NO_JOURNEY
 
-    def test_http_error_returns_none(self):
-        """Given Transitous responds with an HTTP error
-        When journey_mins is called
-        Then it returns None (transient — worth retrying).
+    def test_nudged_origin_recovers_snapping_deadspot(self):
+        """Given the exact origin returns no itineraries (MOTIS can't snap it)
+        When a nudged origin ~150m away routes successfully
+        Then the recovered journey time is returned instead of NO_JOURNEY.
         """
-        resp = Mock()
-        resp.raise_for_status.side_effect = _http_error(500)
-        with patch("flat_finder.scraper.transitous.requests.get", return_value=resp):
+        # First call (exact origin) empty; second call (first nudge) routes.
+        with (
+            patch(
+                "flat_finder.scraper.transitous.requests.get",
+                side_effect=[_ok([]), _ok([{"duration": 6000}])],
+            ),
+            patch("flat_finder.scraper.transitous.time.sleep"),
+        ):
+            client = TransitousCommuteClient()
+            assert client.journey_mins(50.8218, -0.1437, 51.48, -0.17) == 100
+
+    def test_transient_error_during_nudge_returns_none(self):
+        """Given the origin is empty and a nudge hits a transient error
+        When journey_mins is called
+        Then it returns None so the pair is retried next run (no permanent sentinel).
+        """
+        # exact origin empty; nudges: empty, 500-error, empty, empty (1 + 4 = 5 calls)
+        with (
+            patch(
+                "flat_finder.scraper.transitous.requests.get",
+                side_effect=[_ok([]), _ok([]), _err(_http_error(500)), _ok([]), _ok([])],
+            ),
+            patch("flat_finder.scraper.transitous.time.sleep"),
+        ):
+            client = TransitousCommuteClient()
+            assert client.journey_mins(50.8218, -0.1437, 51.48, -0.17) is None
+
+    def test_http_error_returns_none(self):
+        """Given Transitous responds with an HTTP error on the exact origin
+        When journey_mins is called
+        Then it returns None immediately (transient — worth retrying, no nudging).
+        """
+        with patch("flat_finder.scraper.transitous.requests.get", return_value=_err(_http_error(500))):
             client = TransitousCommuteClient()
             assert client.journey_mins(51.5, -0.1, 51.54, -0.17) is None
 
