@@ -7,7 +7,7 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 ## Structure
 - Single `flat_finder/` package, domain-first (clean architecture). UI and scraper are two container targets off the same package.
 - Runs as Docker containers via `docker-compose.yml`; both share the same SQLite DB via `flat-finder-data` volume (WAL mode)
-- Domain folders (`listings/`, `pois/`, `zones/`, `users/`) each hold `model.py` (domain entity), `persistence.py` (ORM + repository), and `dao.py`/`service.py` where present
+- Domain folders (`listings/`, `pois/`, `zones/`, `users/`) each hold `model.py` (domain entity), `dao.py` (abstract protocol), `service.py` (business logic), and `persistence.py` (ORM + repository implementing the dao)
 - Architecture enforced by import-linter (`lint-imports`): domain models must not import infrastructure
 - Multi-user: per-user zones, POIs, user_state (seen/favourite/notes), ntfy topic, and search params. Auth via signed session cookie (`flat_finder/users/auth.py`).
 
@@ -30,9 +30,16 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 - CI: GitHub Actions (`.github/workflows/ci.yml`) -- 5 jobs: lint, type-check, architecture (import-linter), test, e2e (Playwright) on push/PR to main
 - Single multi-stage `Dockerfile` with `ui` and `scraper` targets (uv build); the project is installed as a wheel containing `flat_finder/` (including templates/static). Containers run `alembic upgrade head` before starting.
 
+## Environment
+- `SECRET_KEY` -- **required** for session auth; insecure default (`dev-secret-change-in-production`) if unset. On the Pi, set in `.env` (gitignored). Generate: `python -c "import secrets; print(secrets.token_hex(32))"`.
+- `FLAT_FINDER_DB` -- SQLite path (default `/app/data/flat_finder.db`). Evaluated at import time.
+- `GMAIL_ADDRESS` / `GMAIL_APP_PASSWORD` -- optional, for email notifications.
+- Rent/bedroom env vars are scraper fallbacks; per-user search params (set in Settings) take precedence.
+
 ## Key commands
 - Install/sync deps: `uv sync`
-- Run tests: `uv run pytest -v`
+- Run unit/integration tests: `uv run pytest --ignore=tests/e2e -v`
+- Run E2E tests (needs browsers once): `uv run playwright install chromium` then `uv run pytest tests/e2e/ -v`
 - Lint: `uv run ruff check .` AND `uv run ruff format --check .` — CI runs both; `ruff check` passing does NOT mean format passes. Run `uv run ruff format .` to fix.
 - Type check: `uv run ty check flat_finder/`
 - Rebuild containers: `docker compose up -d --build` (from this directory)
