@@ -1,12 +1,12 @@
 """Tests for the flat_finder scraper (runner.py).
 
-All external HTTP calls (Rightmove, OpenRent, TfL, ntfy) are mocked.
+All external HTTP calls (Rightmove, OpenRent, Transitous, ntfy) are mocked.
 Uses a real SQLite DB via the conftest db_session fixture.
 """
 
 import json
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from flat_finder.listings.persistence import (
@@ -104,6 +104,10 @@ def _make_session_factory(db_session):
     return sessionmaker(bind=db_session.bind)
 
 
+def _mock_commute_client(return_value: int | None = None):
+    return Mock(journey_mins=Mock(return_value=return_value))
+
+
 def _scraper_run_mocked(
     db_session,
     rm_listings: list | None = None,
@@ -119,7 +123,7 @@ def _scraper_run_mocked(
     with (
         patch("flat_finder.scraper.runner.fetch_rightmove", return_value=rm_listings),
         patch("flat_finder.scraper.runner.fetch_openrent", return_value=or_listings),
-        patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=tfl_mins),
+        patch("flat_finder.scraper.runner.TransitousCommuteClient", return_value=_mock_commute_client(tfl_mins)),
         patch("flat_finder.scraper.runner.send_ntfy") as mock_ntfy,
         patch("flat_finder.scraper.runner.send_email"),
         patch("flat_finder.scraper.runner.get_engine") as mock_engine,
@@ -252,7 +256,7 @@ class TestListingZonesPopulation:
         with (
             patch("flat_finder.scraper.runner.fetch_rightmove", return_value=[listing]),
             patch("flat_finder.scraper.runner.fetch_openrent", return_value=[]),
-            patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=None),
+            patch("flat_finder.scraper.runner.TransitousCommuteClient", return_value=_mock_commute_client()),
             patch("flat_finder.scraper.runner.send_ntfy"),
             patch("flat_finder.scraper.runner.send_email"),
             patch("flat_finder.scraper.runner.get_engine") as mock_engine,
@@ -368,7 +372,7 @@ class TestPerUserNotifications:
         with (
             patch("flat_finder.scraper.runner.fetch_rightmove", side_effect=mock_fetch_rm),
             patch("flat_finder.scraper.runner.fetch_openrent", return_value=[]),
-            patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=None),
+            patch("flat_finder.scraper.runner.TransitousCommuteClient", return_value=_mock_commute_client()),
             patch("flat_finder.scraper.runner.send_ntfy") as mock_ntfy,
             patch("flat_finder.scraper.runner.send_email"),
             patch("flat_finder.scraper.runner.get_engine") as mock_engine,

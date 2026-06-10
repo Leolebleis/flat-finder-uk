@@ -1,8 +1,8 @@
-"""Tests for TfL commute fetching: 404 sentinel + per-upsert hook.
+"""Tests for commute client abstraction and backfill loop.
 
-Listings outside the TfL network (e.g. Brighton) get a 404 from Journey
-Planner on every lookup. Those must be recorded as NO_JOURNEY so the
-backfill stops retrying them forever, and excluded from UI/scoring reads.
+The CommuteClient protocol allows swapping transit providers. The backfill
+loop (fetch_commutes_for_listings) must handle NO_JOURNEY sentinels,
+transient failures, and per-upsert hooks regardless of the concrete client.
 """
 
 from unittest.mock import Mock, patch
@@ -10,7 +10,8 @@ from unittest.mock import Mock, patch
 import requests
 from flat_finder.pois.model import POI
 from flat_finder.pois.persistence import POICommuteRepository, POIRepository
-from flat_finder.scraper.commute import NO_JOURNEY, fetch_commutes_for_listings, tfl_journey_mins
+from flat_finder.scraper.commute import NO_JOURNEY, fetch_commutes_for_listings
+from flat_finder.scraper.transitous import TransitousCommuteClient
 from tests.test_repositories import ListingRepository, _make_listing_dict
 
 
@@ -19,68 +20,92 @@ def _http_error(status: int) -> requests.HTTPError:
     return requests.HTTPError(response=response)
 
 
-class TestTflJourneyMins:
-    """Feature: TfL lookup distinguishes permanent vs transient failures"""
+class TestTransitousCommuteClient:
+    """Feature: Transitous API returns journey minutes or failure sentinels"""
 
-    def test_404_returns_no_journey_sentinel(self):
-        """Given TfL responds 404 (coords outside the network)
-        When tfl_journey_mins is called
-        Then it returns NO_JOURNEY rather than None.
+    def test_returns_shortest_journey_minutes(self):
+        """Given Transitous returns multiple itineraries
+        When journey_mins is called
+        Then it returns the shortest duration in minutes.
         """
         resp = Mock()
-        resp.raise_for_status.side_effect = _http_error(404)
-        with patch("flat_finder.scraper.commute.requests.get", return_value=resp):
-            assert tfl_journey_mins(50.82, -0.14, 51.54, -0.17) == NO_JOURNEY
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = {
+            "itineraries": [
+                {"duration": 5940},
+                {"duration": 7200},
+            ]
+        }
+        with patch("flat_finder.scraper.transitous.requests.get", return_value=resp):
+            client = TransitousCommuteClient()
+            assert client.journey_mins(50.82, -0.14, 51.54, -0.17) == 99
 
-    def test_server_error_returns_none(self):
-        """Given TfL responds 500 (transient)
-        When tfl_journey_mins is called
-        Then it returns None so the lookup is retried later.
+    def test_empty_itineraries_returns_no_journey(self):
+        """Given Transitous returns an empty itinerary list
+        When journey_mins is called
+        Then it returns NO_JOURNEY (permanent — no route exists).
+        """
+        resp = Mock()
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = {"itineraries": []}
+        with patch("flat_finder.scraper.transitous.requests.get", return_value=resp):
+            client = TransitousCommuteClient()
+            assert client.journey_mins(50.82, -0.14, 51.54, -0.17) == NO_JOURNEY
+
+    def test_http_error_returns_none(self):
+        """Given Transitous responds with an HTTP error
+        When journey_mins is called
+        Then it returns None (transient — worth retrying).
         """
         resp = Mock()
         resp.raise_for_status.side_effect = _http_error(500)
-        with patch("flat_finder.scraper.commute.requests.get", return_value=resp):
-            assert tfl_journey_mins(51.5, -0.1, 51.54, -0.17) is None
+        with patch("flat_finder.scraper.transitous.requests.get", return_value=resp):
+            client = TransitousCommuteClient()
+            assert client.journey_mins(51.5, -0.1, 51.54, -0.17) is None
 
     def test_connection_error_returns_none(self):
-        """Given the TfL request fails at the network level
-        When tfl_journey_mins is called
-        Then it returns None so the lookup is retried later.
+        """Given the Transitous request fails at the network level
+        When journey_mins is called
+        Then it returns None (transient — worth retrying).
         """
         with patch(
-            "flat_finder.scraper.commute.requests.get",
+            "flat_finder.scraper.transitous.requests.get",
             side_effect=requests.ConnectionError("boom"),
         ):
-            assert tfl_journey_mins(51.5, -0.1, 51.54, -0.17) is None
+            client = TransitousCommuteClient()
+            assert client.journey_mins(51.5, -0.1, 51.54, -0.17) is None
 
 
 class TestFetchCommutesForListings:
-    """Feature: shared backfill loop"""
+    """Feature: shared backfill loop accepts any CommuteClient"""
 
     def _poi(self) -> POI:
         return POI(id=1, user_id=1, name="Work", lat=51.54, lng=-0.17, color_index=0, created_at="now")
 
-    def test_stores_no_journey_sentinel_on_404(self):
-        """Given a listing whose TfL lookup 404s
+    def _mock_client(self, return_value: int | None) -> Mock:
+        client = Mock()
+        client.journey_mins.return_value = return_value
+        return client
+
+    def test_stores_no_journey_sentinel(self):
+        """Given a client returns NO_JOURNEY for a listing
         When fetch_commutes_for_listings runs
         Then the NO_JOURNEY sentinel is upserted (so it is not retried)."""
         dao = Mock()
+        client = self._mock_client(NO_JOURNEY)
         rows = [{"id": "rm_1", "latitude": 50.82, "longitude": -0.14}]
-        with (
-            patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=NO_JOURNEY),
-            patch("flat_finder.scraper.commute.time.sleep"),
-        ):
-            fetch_commutes_for_listings(dao, self._poi(), rows)
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client)
         dao.upsert.assert_called_once_with("rm_1", 1, NO_JOURNEY)
 
     def test_transient_failure_skips_upsert(self):
-        """Given a listing whose TfL lookup fails transiently (None)
+        """Given a client returns None (transient failure)
         When fetch_commutes_for_listings runs
         Then nothing is upserted so the lookup is retried next run."""
         dao = Mock()
+        client = self._mock_client(None)
         rows = [{"id": "rm_1", "latitude": 51.5, "longitude": -0.1}]
-        with patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=None):
-            fetch_commutes_for_listings(dao, self._poi(), rows)
+        fetch_commutes_for_listings(dao, self._poi(), rows, client)
         dao.upsert.assert_not_called()
 
     def test_after_upsert_called_per_row(self):
@@ -89,15 +114,13 @@ class TestFetchCommutesForListings:
         Then the hook (e.g. session.commit) runs once per upsert."""
         dao = Mock()
         hook = Mock()
+        client = self._mock_client(25)
         rows = [
             {"id": "rm_1", "latitude": 51.5, "longitude": -0.1},
             {"id": "rm_2", "latitude": 51.6, "longitude": -0.2},
         ]
-        with (
-            patch("flat_finder.scraper.commute.tfl_journey_mins", return_value=25),
-            patch("flat_finder.scraper.commute.time.sleep"),
-        ):
-            fetch_commutes_for_listings(dao, self._poi(), rows, after_upsert=hook)
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client, after_upsert=hook)
         assert hook.call_count == 2
 
 

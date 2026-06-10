@@ -19,6 +19,7 @@ from flat_finder.geo import extract_coords_from_url
 from flat_finder.pois.persistence import POICommuteRepository, POIRepository
 from flat_finder.pois.service import POIService
 from flat_finder.scraper.commute import fetch_commutes_for_listings
+from flat_finder.scraper.transitous import TransitousCommuteClient
 from flat_finder.users.service import UserService
 from flat_finder.zones.service import ZoneService
 
@@ -27,7 +28,7 @@ router = APIRouter()
 
 
 def _backfill_poi(poi_id: int, session_factory: Callable[[], Session]) -> None:
-    """Background thread: fetch TfL commute times for all listings missing this POI."""
+    """Background thread: fetch commute times for all listings missing this POI."""
     session = session_factory()
     try:
         poi = POIRepository(session).get_by_id(poi_id)
@@ -35,7 +36,7 @@ def _backfill_poi(poi_id: int, session_factory: Callable[[], Session]) -> None:
             return
         commute_repo = POICommuteRepository(session)
         rows = commute_repo.get_listings_missing_poi(poi_id)
-        fetch_commutes_for_listings(commute_repo, poi, rows, after_upsert=session.commit)
+        fetch_commutes_for_listings(commute_repo, poi, rows, TransitousCommuteClient(), after_upsert=session.commit)
     finally:
         session.close()
 
