@@ -106,12 +106,17 @@ def format_email_html(listings: list[dict]) -> str:
 
 
 def send_ntfy(topic: str, title: str, body: str, click_url: str | None = None) -> None:
-    """POST to https://ntfy.sh/{topic} with Title header and body."""
-    url = f"https://ntfy.sh/{topic}"
-    headers = {"Title": title}
+    """Publish to ntfy.sh using the JSON format.
+
+    ntfy's ``Title`` (and ``Click``) are otherwise sent as HTTP headers, which
+    must be latin-1 — a non-latin-1 character such as an em-dash (—) raises
+    UnicodeEncodeError and the notification is lost. The JSON publishing format
+    carries title/message/click in a UTF-8 body instead, so any Unicode is safe.
+    """
+    payload: dict[str, str] = {"topic": topic, "title": title, "message": body}
     if click_url:
-        headers["Click"] = click_url
-    resp = requests.post(url, data=body.encode("utf-8"), headers=headers, timeout=10)
+        payload["click"] = click_url
+    resp = requests.post("https://ntfy.sh/", json=payload, timeout=10)
     resp.raise_for_status()
 
 
