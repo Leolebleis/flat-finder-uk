@@ -24,6 +24,7 @@ from flat_finder.scraper.notifier import (
 from flat_finder.scraper.openrent import fetch_openrent
 from flat_finder.scraper.rightmove import fetch_rightmove
 from flat_finder.scraper.transitous import TransitousCommuteClient
+from flat_finder.scraping import make_retry_session
 from flat_finder.users.persistence import UserRepository
 from flat_finder.zones.persistence import ListingZoneRepository, ZoneRepository
 
@@ -171,6 +172,10 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         users_with_ntfy = user_repo.get_all_with_ntfy()
         health_ntfy_topic = users_with_ntfy[0].ntfy_topic if users_with_ntfy else None
 
+        # One session per run: keep-alive + cookies persist across zones, and
+        # transient 429/5xx responses are retried with backoff (see make_retry_session)
+        http_session = make_retry_session()
+
         for zone in all_zones:
             radius_km = zone.covering_radius_km or DEFAULT_ZONE_RADIUS_KM
             rm_radius_miles = radius_km / KM_PER_MILE
@@ -179,13 +184,13 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             rm_listings, rm_error = _scrape_source(
                 f"rightmove/{zone.name}",
                 lambda z=zone, r=rm_radius_miles: fetch_rightmove(
-                    z.rightmove_id or "", r, search_min_beds, search_max_beds, search_max_rent
+                    z.rightmove_id or "", r, search_min_beds, search_max_beds, search_max_rent, session=http_session
                 ),
             )
             or_listings, or_error = _scrape_source(
                 f"openrent/{zone.name}",
                 lambda z=zone, r=or_radius_km: fetch_openrent(
-                    z.openrent_term or "", r, search_min_beds, search_max_beds, search_max_rent
+                    z.openrent_term or "", r, search_min_beds, search_max_beds, search_max_rent, session=http_session
                 ),
             )
 
@@ -255,13 +260,18 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             for listing in new_listings:
                 listing["poi_commutes"] = commutes.get(listing["id"], {})
 
-        # Archive listings older than the retention window
-        archived_ids = listing_repo.archive_old(PRUNE_AFTER_DAYS)
-        if archived_ids:
-            listing_state_repo.delete_for_listings(archived_ids)
-            poi_commute_repo.delete_for_listings(archived_ids)
-            listing_zone_repo.delete_for_listings(archived_ids)
-            log.info("Archived %d listings older than %d days", len(archived_ids), PRUNE_AFTER_DAYS)
+        # Archive listings older than the retention window. Guarded so an
+        # archiving failure can't abort the run before notifications go out.
+        try:
+            archived_ids = listing_repo.archive_old(PRUNE_AFTER_DAYS)
+            if archived_ids:
+                listing_state_repo.delete_for_listings(archived_ids)
+                poi_commute_repo.delete_for_listings(archived_ids)
+                listing_zone_repo.delete_for_listings(archived_ids)
+                log.info("Archived %d listings older than %d days", len(archived_ids), PRUNE_AFTER_DAYS)
+        except Exception:
+            session.rollback()
+            log.exception("Archiving old listings failed")
 
         if first_run:
             _set_scraper_state(session, "initialised", "true")

@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 import re
 from datetime import UTC, datetime
@@ -6,7 +7,9 @@ from urllib.parse import urlencode
 
 import requests
 
-from flat_finder.scraping import HTTP_HEADERS, check_description, should_exclude_text
+from flat_finder.scraping import check_description, make_retry_session, should_exclude_text
+
+log = logging.getLogger("flat-finder")
 
 SEARCH_URL = "https://www.rightmove.co.uk/property-to-rent/find.html"
 PAGE_SIZE = 24
@@ -119,14 +122,36 @@ def _extract_next_data(html: str) -> dict:
     return json.loads(match.group(1))
 
 
-def fetch_rightmove(location_id: str, radius: float, min_beds: int, max_beds: int, max_price: int) -> list[dict]:
+def fetch_rightmove(  # noqa: PLR0913
+    location_id: str,
+    radius: float,
+    min_beds: int,
+    max_beds: int,
+    max_price: int,
+    session: requests.Session | None = None,
+) -> list[dict]:
+    if session is None:
+        session = make_retry_session()
     all_listings = []
     index = 0
     while True:
         url = build_search_url(location_id, radius, min_beds, max_beds, max_price, index)
-        resp = requests.get(url, headers=HTTP_HEADERS, timeout=30)
-        resp.raise_for_status()
-        next_data = _extract_next_data(resp.text)
+        try:
+            resp = session.get(url, timeout=30)
+            resp.raise_for_status()
+            next_data = _extract_next_data(resp.text)
+        except (requests.RequestException, ValueError):
+            if all_listings:
+                # A later page failed mid-pagination: keep what we already
+                # fetched rather than discarding the whole zone
+                log.warning(
+                    "Rightmove page at index %d failed; keeping %d listings from earlier pages",
+                    index,
+                    len(all_listings),
+                    exc_info=True,
+                )
+                break
+            raise
         search_results = next_data["props"]["pageProps"]["searchResults"]
         listings = parse_rightmove_response(search_results)
         if not listings:

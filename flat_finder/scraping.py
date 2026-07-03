@@ -2,15 +2,48 @@
 
 import re
 
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
 
+# NOTE: bumping the Chrome version here gets 403'd by Rightmove's WAF
+# (UA claim vs TLS-fingerprint consistency check) — Chrome/120 passes, tested 2026-07-03
 HTTP_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-GB,en;q=0.9",
 }
+
+RETRYABLE_STATUSES = (429, 500, 502, 503, 504)
+
+
+def make_retry_session() -> requests.Session:
+    """Build a requests session that retries transient failures with backoff.
+
+    Retries connection errors, read timeouts, and 429/5xx responses (honouring
+    Retry-After on 429/503). Backoff is jittered so the retry cadence doesn't
+    itself look bot-like.
+    """
+    retry = Retry(
+        total=3,
+        status_forcelist=RETRYABLE_STATUSES,
+        backoff_factor=2,
+        backoff_jitter=1,
+        allowed_methods=("GET",),
+        respect_retry_after_header=True,
+    )
+    session = requests.Session()
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    session.headers.update(HTTP_HEADERS)
+    return session
+
 
 OUTDOOR_PATTERNS = {
     r"\bgarden\b": "garden",

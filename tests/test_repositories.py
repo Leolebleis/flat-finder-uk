@@ -1,6 +1,6 @@
 """E2E repository tests using a real in-memory SQLite DB via conftest fixtures."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from flat_finder.listings.persistence import ListingRepository, ListingStateRepository
 from flat_finder.pois.persistence import POICommuteRepository, POIRepository
@@ -441,6 +441,32 @@ class TestListingRepository:
         results = repo.get_all_with_state(user_id=1, zone_ids=[])
 
         assert results == []
+
+    def test_archive_old_rearchives_listing_still_live_on_site(self, db_session):
+        """Given a listing that was archived, then re-scraped because the site
+        still advertises it, and has aged past the retention window again
+        When archive_old runs a second time
+        Then it must not raise and the listing is archived again.
+        """
+        repo = ListingRepository(db_session)
+        stale = _make_listing_dict("rm_120")
+        stale["first_seen"] = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=20)
+        repo.insert(stale)
+        db_session.commit()
+        repo.archive_old(14)
+        db_session.commit()
+
+        # The site still lists it, so the scraper re-inserts it
+        rescraped = _make_listing_dict("rm_120")
+        rescraped["first_seen"] = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=20)
+        rescraped["price_pcm"] = 1600
+        repo.insert(rescraped)
+        db_session.commit()
+
+        archived = repo.archive_old(14)
+
+        assert archived == ["rm_120"]
+        assert repo.get_by_id("rm_120") is None
 
 
 # ---------------------------------------------------------------------------

@@ -514,6 +514,20 @@ class TestListingArchival:
         lz_rows = db_session.query(ListingZoneDB).filter_by(listing_id="rightmove_orphan").all()
         assert len(lz_rows) == 0
 
+    def test_run_survives_archive_failure(self, db_session):
+        """Given the archive step raises unexpectedly
+        When run() executes
+        Then the run still completes and notifications are still sent.
+        """
+        _create_user_with_zone(db_session, "alice", ntfy_topic="alice-topic")
+        listing = _make_listing_dict()
+
+        with patch.object(ListingRepository, "archive_old", side_effect=RuntimeError("boom")):
+            mock_ntfy = _scraper_run_mocked(db_session, rm_listings=[listing])
+
+        # First run: the "initialised" notification (sent after archiving) still went out
+        assert any(call.args[0] == "alice-topic" for call in mock_ntfy.call_args_list)
+
     def test_scraper_run_archives_old_listings(self, db_session):
         """Integration: run() archives old listings via the scraper loop."""
         user_repo = UserRepository(db_session)

@@ -168,7 +168,10 @@ class ListingRepository:
         archived_ids = [row.id for row in old_rows]
         for row in old_rows:
             archive = ListingArchiveDB(**{f: getattr(row, f) for f in _LISTING_FIELDS})
-            self._session.add(archive)
+            # merge, not add: a listing archived before can be re-scraped while
+            # still advertised, then age out again — re-archiving replaces the
+            # old snapshot instead of violating the archive PK
+            self._session.merge(archive)
             self._session.delete(row)
 
         if archived_ids:

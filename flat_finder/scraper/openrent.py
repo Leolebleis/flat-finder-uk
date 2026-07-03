@@ -6,7 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from flat_finder.scraping import HTTP_HEADERS, check_description, should_exclude_text
+from flat_finder.scraping import check_description, make_retry_session, should_exclude_text
 
 BASE_URL = "https://www.openrent.co.uk/properties-to-rent"
 
@@ -187,10 +187,19 @@ def parse_openrent_html(html: str) -> list[dict]:
     return listings
 
 
-def fetch_openrent(location: str, radius_km: int, min_beds: int, max_beds: int, max_price: int) -> list[dict]:
+def fetch_openrent(  # noqa: PLR0913
+    location: str,
+    radius_km: int,
+    min_beds: int,
+    max_beds: int,
+    max_price: int,
+    session: requests.Session | None = None,
+) -> list[dict]:
     """Fetch and parse OpenRent search results."""
+    if session is None:
+        session = make_retry_session()
     url = build_search_url(location, radius_km, min_beds, max_beds, max_price)
-    resp = requests.get(url, headers=HTTP_HEADERS, timeout=30, allow_redirects=True)
+    resp = session.get(url, timeout=30, allow_redirects=True)
     resp.raise_for_status()
     listings = parse_openrent_html(resp.text)
     # OpenRent doesn't always enforce server-side filters after redirect,
