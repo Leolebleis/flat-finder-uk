@@ -130,8 +130,7 @@ def fetch_rightmove(  # noqa: PLR0913
     max_price: int,
     session: requests.Session | None = None,
 ) -> list[dict]:
-    if session is None:
-        session = make_retry_session()
+    session = session or make_retry_session()
     all_listings = []
     index = 0
     while True:

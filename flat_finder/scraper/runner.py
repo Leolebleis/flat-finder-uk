@@ -260,19 +260,6 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             for listing in new_listings:
                 listing["poi_commutes"] = commutes.get(listing["id"], {})
 
-        # Archive listings older than the retention window. Guarded so an
-        # archiving failure can't abort the run before notifications go out.
-        try:
-            archived_ids = listing_repo.archive_old(PRUNE_AFTER_DAYS)
-            if archived_ids:
-                listing_state_repo.delete_for_listings(archived_ids)
-                poi_commute_repo.delete_for_listings(archived_ids)
-                listing_zone_repo.delete_for_listings(archived_ids)
-                log.info("Archived %d listings older than %d days", len(archived_ids), PRUNE_AFTER_DAYS)
-        except Exception:
-            session.rollback()
-            log.exception("Archiving old listings failed")
-
         if first_run:
             _set_scraper_state(session, "initialised", "true")
             log.info("First run: found %d existing listings", len(all_listings))
@@ -312,7 +299,23 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         else:
             log.info("No new listings found")
 
+        # User-facing work is done — persist it before the maintenance phase
         session.commit()
+
+        # Archive listings older than the retention window. Runs last, in its
+        # own commit scope, so an archiving failure can only ever lose the
+        # archive pass itself — never notifications or scraped listings.
+        try:
+            archived_ids = listing_repo.archive_old(PRUNE_AFTER_DAYS)
+            if archived_ids:
+                listing_state_repo.delete_for_listings(archived_ids)
+                poi_commute_repo.delete_for_listings(archived_ids)
+                listing_zone_repo.delete_for_listings(archived_ids)
+                log.info("Archived %d listings older than %d days", len(archived_ids), PRUNE_AFTER_DAYS)
+            session.commit()
+        except Exception:
+            session.rollback()
+            log.exception("Archiving old listings failed")
     finally:
         session.close()
         engine.dispose()

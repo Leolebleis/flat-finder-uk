@@ -19,8 +19,6 @@ HTTP_HEADERS = {
     "Accept-Language": "en-GB,en;q=0.9",
 }
 
-RETRYABLE_STATUSES = (429, 500, 502, 503, 504)
-
 
 def make_retry_session() -> requests.Session:
     """Build a requests session that retries transient failures with backoff.
@@ -31,11 +29,10 @@ def make_retry_session() -> requests.Session:
     """
     retry = Retry(
         total=3,
-        status_forcelist=RETRYABLE_STATUSES,
+        status_forcelist=(429, 500, 502, 503, 504),
         backoff_factor=2,
         backoff_jitter=1,
         allowed_methods=("GET",),
-        respect_retry_after_header=True,
     )
     session = requests.Session()
     adapter = HTTPAdapter(max_retries=retry)

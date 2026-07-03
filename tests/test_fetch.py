@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 import requests
 from flat_finder.scraper.rightmove import fetch_rightmove
-from flat_finder.scraping import RETRYABLE_STATUSES, make_retry_session
+from flat_finder.scraping import make_retry_session
 
 
 def _rightmove_page_html(result_count: int, prop_id: int) -> str:
@@ -60,7 +60,7 @@ class TestRetrySession:
         retry = session.get_adapter("https://www.rightmove.co.uk").max_retries
 
         assert retry.total >= 3
-        for status in RETRYABLE_STATUSES:
+        for status in (429, 500, 502, 503, 504):
             assert status in retry.status_forcelist
         assert retry.backoff_factor > 0
         assert retry.respect_retry_after_header is True

@@ -196,8 +196,7 @@ def fetch_openrent(  # noqa: PLR0913
     session: requests.Session | None = None,
 ) -> list[dict]:
     """Fetch and parse OpenRent search results."""
-    if session is None:
-        session = make_retry_session()
+    session = session or make_retry_session()
     url = build_search_url(location, radius_km, min_beds, max_beds, max_price)
     resp = session.get(url, timeout=30, allow_redirects=True)
     resp.raise_for_status()
