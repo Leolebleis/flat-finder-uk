@@ -23,6 +23,7 @@ from flat_finder.scraper.notifier import (
 )
 from flat_finder.scraper.openrent import fetch_openrent
 from flat_finder.scraper.rightmove import fetch_rightmove
+from flat_finder.scraper.scrapling_client import ScraplingSession
 from flat_finder.scraper.transitous import TransitousCommuteClient
 from flat_finder.scraping import make_retry_session
 from flat_finder.users.persistence import UserRepository
@@ -138,6 +139,7 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
     engine = get_engine(config.DB_PATH)
     Session = get_session(engine)  # noqa: N806
     session = Session()
+    rm_session = None
     try:
         listing_repo = ListingRepository(session)
         listing_state_repo = ListingStateRepository(session)
@@ -173,8 +175,17 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         health_ntfy_topic = users_with_ntfy[0].ntfy_topic if users_with_ntfy else None
 
         # One session per run: keep-alive + cookies persist across zones, and
-        # transient 429/5xx responses are retried with backoff (see make_retry_session)
+        # transient statuses (TRANSIENT_STATUSES) are retried with backoff on
+        # both transports (urllib3 Retry here, ScraplingSession's own loop there)
         http_session = make_retry_session()
+
+        # Rightmove's WAF intermittently challenges the plain-requests TLS fingerprint;
+        # when configured, fetch it via the scrapling MCP endpoint (impersonated Chrome
+        # fingerprint, VPN egress). OpenRent stays direct: its AWS WAF blocks VPN IPs.
+        rm_session = http_session
+        if config.SCRAPLING_MCP_URL:
+            rm_session = ScraplingSession(config.SCRAPLING_MCP_URL, fallback=http_session)
+            log.info("Routing Rightmove fetches via scrapling MCP")
 
         for zone in all_zones:
             radius_km = zone.covering_radius_km or DEFAULT_ZONE_RADIUS_KM
@@ -184,7 +195,7 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             rm_listings, rm_error = _scrape_source(
                 f"rightmove/{zone.name}",
                 lambda z=zone, r=rm_radius_miles: fetch_rightmove(
-                    z.rightmove_id or "", r, search_min_beds, search_max_beds, search_max_rent, session=http_session
+                    z.rightmove_id or "", r, search_min_beds, search_max_beds, search_max_rent, session=rm_session
                 ),
             )
             or_listings, or_error = _scrape_source(
@@ -317,6 +328,8 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             session.rollback()
             log.exception("Archiving old listings failed")
     finally:
+        if isinstance(rm_session, ScraplingSession):
+            rm_session.close()
         session.close()
         engine.dispose()
 

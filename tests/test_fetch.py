@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 import requests
-from flat_finder.scraper.rightmove import fetch_rightmove
+from flat_finder.scraper.rightmove import _extract_next_data, fetch_rightmove
 from flat_finder.scraping import make_retry_session
 
 
@@ -115,3 +115,15 @@ class TestFetchRightmovePartialResults:
 
         with pytest.raises(requests.HTTPError):
             fetch_rightmove("REGION^1", 1.0, 1, 2, 2000, session=session)
+
+
+class TestNextDataErrorContext:
+    """Feature: missing __NEXT_DATA__ errors carry evidence of what was served"""
+
+    def test_missing_next_data_error_includes_page_head(self):
+        """Given HTML without a __NEXT_DATA__ script (e.g. a challenge page)
+        When extraction fails
+        Then the error message includes the page head so logs show what Rightmove served.
+        """
+        with pytest.raises(ValueError, match="verify you are human"):
+            _extract_next_data("<html>please verify you are human</html>")
