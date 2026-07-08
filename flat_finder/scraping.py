@@ -1,10 +1,18 @@
 """Helpers shared between Rightmove and OpenRent scrapers."""
 
 import re
+from typing import Protocol
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+
+class HTMLFetcher(Protocol):
+    """Anything that can GET a page like a requests session (see ScraplingSession)."""
+
+    def get(self, url: str, *, timeout: float = 30) -> requests.Response: ...
+
 
 EXCLUDE_TERMS = ["shared", "bedsit", "studio", "flat share", "house share", "room available"]
 
@@ -20,6 +28,11 @@ HTTP_HEADERS = {
 }
 
 
+# Upstream statuses worth retrying on any transport (urllib3 Retry here,
+# ScraplingSession's own retry loop on the MCP path)
+TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
+
+
 def make_retry_session() -> requests.Session:
     """Build a requests session that retries transient failures with backoff.
 
@@ -29,7 +42,7 @@ def make_retry_session() -> requests.Session:
     """
     retry = Retry(
         total=3,
-        status_forcelist=(429, 500, 502, 503, 504),
+        status_forcelist=TRANSIENT_STATUSES,
         backoff_factor=2,
         backoff_jitter=1,
         allowed_methods=("GET",),

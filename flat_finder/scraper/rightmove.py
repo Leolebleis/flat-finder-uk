@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 import requests
 
-from flat_finder.scraping import check_description, make_retry_session, should_exclude_text
+from flat_finder.scraping import HTMLFetcher, check_description, make_retry_session, should_exclude_text
 
 log = logging.getLogger("flat-finder")
 
@@ -117,7 +117,7 @@ def _extract_next_data(html: str) -> dict:
     """Extract __NEXT_DATA__ JSON from Rightmove HTML page."""
     match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html)
     if not match:
-        msg = "Could not find __NEXT_DATA__ in Rightmove HTML"
+        msg = f"Could not find __NEXT_DATA__ in Rightmove HTML (len={len(html)}, head={html[:200]!r})"
         raise ValueError(msg)
     return json.loads(match.group(1))
 
@@ -128,7 +128,7 @@ def fetch_rightmove(  # noqa: PLR0913
     min_beds: int,
     max_beds: int,
     max_price: int,
-    session: requests.Session | None = None,
+    session: HTMLFetcher | None = None,
 ) -> list[dict]:
     session = session or make_retry_session()
     all_listings = []

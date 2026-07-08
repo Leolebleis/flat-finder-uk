@@ -19,5 +19,8 @@ MAX_RENT_PCM = int(get_env("MAX_RENT_PCM", "2200"))
 MIN_BEDROOMS = int(get_env("MIN_BEDROOMS", "1"))
 MAX_BEDROOMS = int(get_env("MAX_BEDROOMS", "2"))
 
+# Scraping: MCP endpoint of a running scrapling container; empty = fetch directly
+SCRAPLING_MCP_URL = get_env("SCRAPLING_MCP_URL")
+
 # Security
 SECRET_KEY = get_env("SECRET_KEY", "dev-secret-change-in-production")
