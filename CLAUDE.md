@@ -34,6 +34,7 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 - `SECRET_KEY` -- **required** for session auth; insecure default (`dev-secret-change-in-production`) if unset. On the Pi, set in `.env` (gitignored). Generate: `python -c "import secrets; print(secrets.token_hex(32))"`.
 - `FLAT_FINDER_DB` -- SQLite path (default `/app/data/flat_finder.db`). Evaluated at import time.
 - `GMAIL_ADDRESS` / `GMAIL_APP_PASSWORD` -- optional, for email notifications.
+- `SCRAPLING_MCP_URL` -- optional; routes Rightmove fetches through a scrapling MCP container (Chrome TLS fingerprint, avoids WAF bot-checks). On the Pi set to `http://gluetun:8001/mcp` in `.env` (scraper is on pi-net). Empty = direct fetches. Never route OpenRent through it: its AWS WAF blocks VPN/datacenter IPs.
 - Rent/bedroom env vars are scraper fallbacks; per-user search params (set in Settings) take precedence.
 
 ## Key commands
@@ -69,6 +70,8 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 - **Hatch wheel inclusion**: `packages = ["flat_finder"]` already includes non-Python files (templates/, static/, binaries) under that dir. Don't add `force-include` -- it duplicates entries and warns at build time.
 - **Outdoor detection**: Uses regex word boundaries + exclusion patterns. "communal garden", "shared garden", street names like "Gardens", and substrings ("occupation" matching "patio") are excluded.
 - **Docker build context**: docker-compose.yml is in this repo. Changes must be on `main` for rebuild to pick them up.
+- **Merging is not deploying**: containers only get new code after `git pull` + `docker compose up -d --build` on the Pi. When something is "still broken", first compare `docker ps --format '{{.Names}} {{.CreatedAt}}'` against the fix's merge date.
+- **Rebuild discards logs**: `docker compose up -d --build` recreates containers and their logs are lost. Capture `docker logs flat-finder-scraper` to a file before rebuilding when debugging.
 - **DB schema ownership**: Each domain folder owns its ORM models in `<domain>/persistence.py`, all registered on a shared SQLAlchemy `Base` (see `flat_finder/persistence.py`, which imports every model module). Schema changes go through Alembic migrations in `alembic/versions/`; containers run `alembic upgrade head` on startup (safe with WAL). The scraper writes to UI-owned tables (e.g. prune-orphan, listing_zones) -- that works because all models share one `Base.metadata`.
 - **Migrations**: Use Alembic (`alembic revision --autogenerate -m "..."` then review). SQLite needs batch mode for column drops/alters. Migrations must handle both fresh and existing DBs (the Pi has live data).
 - **Commute API rate limiting**: Backfill loops need `time.sleep(0.5)` between API calls. Transitous is community-run — be respectful of their resources.
