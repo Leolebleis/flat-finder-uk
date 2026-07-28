@@ -1,13 +1,8 @@
 """Tests for Rightmove search URL construction."""
 
-from urllib.parse import parse_qs, urlparse
-
 import pytest
 from flat_finder.scraper.rightmove import ALLOWED_RADII, build_search_url, snap_radius
-
-
-def _params_of(url: str) -> dict[str, list[str]]:
-    return parse_qs(urlparse(url).query)
+from tests.conftest import params_of
 
 
 class TestSnapRadius:
@@ -75,14 +70,14 @@ class TestBuildSearchUrl:
         no __NEXT_DATA__ blob — this silently broke every zone on 2026-07-20.
         """
         url = build_search_url("OUTCODE^1684", 2.1810183056408214, 1, 3, 2200)
-        assert _params_of(url)["radius"] == ["3.0"]
+        assert params_of(url)["radius"] == ["3.0"]
 
     def test_preserves_other_params(self):
         """Given search criteria and a pagination offset
         When the search URL is built
         Then every other query parameter is carried through unchanged.
         """
-        params = _params_of(build_search_url("OUTCODE^1684", 1.0, 1, 3, 2200, index=48))
+        params = params_of(build_search_url("OUTCODE^1684", 1.0, 1, 3, 2200, index=48))
         assert params["locationIdentifier"] == ["OUTCODE^1684"]
         assert params["minBedrooms"] == ["1"]
         assert params["maxBedrooms"] == ["3"]
@@ -96,5 +91,5 @@ class TestBuildSearchUrl:
         Then the radius param is always a value Rightmove accepts.
         """
         for step in range(0, 4000, 37):
-            radius = _params_of(build_search_url("OUTCODE^1", step / 100, 1, 3, 2200))["radius"][0]
+            radius = params_of(build_search_url("OUTCODE^1", step / 100, 1, 3, 2200))["radius"][0]
             assert float(radius) in ALLOWED_RADII

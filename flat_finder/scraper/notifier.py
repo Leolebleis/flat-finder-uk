@@ -1,5 +1,6 @@
 import smtplib
 import ssl
+from datetime import timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
@@ -36,6 +37,14 @@ def format_failure_message(source: str, error: str) -> tuple[str, str]:
     """
     title = f"Flat Finder: {source} scrape failed"
     body = f"Error: {error}"
+    return title, body
+
+
+def format_still_failing_message(source: str, error: str, failing_for: timedelta) -> tuple[str, str]:
+    """Returns (title, body) for a repeat notification about an ongoing failure."""
+    duration = f"{failing_for.days}d" if failing_for.days else f"{int(failing_for.total_seconds() // 3600)}h"
+    title = f"Flat Finder: {source} still failing ({duration})"
+    body = f"No successful scrape for {duration}.\nError: {error}"
     return title, body
 
 

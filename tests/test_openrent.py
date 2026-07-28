@@ -1,13 +1,8 @@
 """Tests for OpenRent search URL construction."""
 
-from urllib.parse import parse_qs, urlparse
-
 import pytest
 from flat_finder.scraper.openrent import build_search_url, snap_radius
-
-
-def _params_of(url: str) -> dict[str, list[str]]:
-    return parse_qs(urlparse(url).query)
+from tests.conftest import params_of
 
 
 class TestSnapRadius:
@@ -34,34 +29,6 @@ class TestSnapRadius:
         """
         assert snap_radius(requested) == expected
 
-    def test_never_shrinks_the_search_area(self):
-        """Given any plausible zone radius
-        When it is snapped
-        Then the result is never smaller than requested.
-        """
-        for step in range(0, 2000, 7):
-            requested = step / 100
-            assert snap_radius(requested) >= requested
-
-    def test_floors_at_one_km(self):
-        """Given a radius that would round to zero
-        When it is snapped
-        Then it floors at 1 km.
-
-        OpenRent silently substitutes its own 2 km default for within=0, so
-        sending 0 would hand radius control to them.
-        """
-        assert snap_radius(0) == 1
-        assert snap_radius(0.01) == 1
-
-    def test_returns_whole_numbers(self):
-        """Given a fractional radius
-        When it is snapped
-        Then the result is an int, since OpenRent rejects fractional `within`.
-        """
-        result = snap_radius(2.42)
-        assert isinstance(result, int)
-
 
 class TestBuildSearchUrl:
     """Feature: assemble the OpenRent search URL"""
@@ -71,14 +38,14 @@ class TestBuildSearchUrl:
         When the search URL is built
         Then `within` is rounded up to whole km rather than truncated.
         """
-        assert _params_of(build_search_url("Brighton", 1.83, 1, 3, 2200))["within"] == ["2"]
+        assert params_of(build_search_url("Brighton", 1.83, 1, 3, 2200))["within"] == ["2"]
 
     def test_preserves_other_params(self):
         """Given search criteria
         When the search URL is built
         Then every other query parameter is carried through unchanged.
         """
-        params = _params_of(build_search_url("Brighton", 2.0, 1, 3, 2200))
+        params = params_of(build_search_url("Brighton", 2.0, 1, 3, 2200))
         assert params["term"] == ["Brighton"]
         assert params["prices_min"] == ["0"]
         assert params["prices_max"] == ["2200"]

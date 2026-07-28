@@ -35,6 +35,7 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 - `FLAT_FINDER_DB` -- SQLite path (default `/app/data/flat_finder.db`). Evaluated at import time.
 - `GMAIL_ADDRESS` / `GMAIL_APP_PASSWORD` -- optional, for email notifications.
 - `SCRAPLING_MCP_URL` -- optional; routes Rightmove fetches through a scrapling MCP container (Chrome TLS fingerprint, avoids WAF bot-checks). On the Pi set to `http://gluetun:8001/mcp` in `.env` (scraper is on pi-net). Empty = direct fetches. Never route OpenRent through it: its AWS WAF blocks VPN/datacenter IPs.
+- `SCRAPER_REALERT_HOURS` -- optional; how often to re-notify about a source that is still failing (default 24, `0` disables). Failure alerts are otherwise edge-triggered, so a permanently broken source would alert once and then look identical to a healthy one.
 - Rent/bedroom env vars are scraper fallbacks; per-user search params (set in Settings) take precedence.
 
 ## Key commands

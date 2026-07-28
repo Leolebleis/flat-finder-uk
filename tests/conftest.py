@@ -2,6 +2,7 @@
 # before create_all is called.
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from urllib.parse import parse_qs, urlparse
 
 import flat_finder.persistence  # noqa: F401
 import pytest
@@ -69,3 +70,8 @@ def authed_client(app, db_session) -> TestClient:
     with TestClient(app, root_path="/flat", raise_server_exceptions=True) as c:
         c.post("/login", data={"username": "leo"})
         yield c
+
+
+def params_of(url: str) -> dict[str, list[str]]:
+    """Decode a search URL's query string, for adapter URL-building tests."""
+    return parse_qs(urlparse(url).query)

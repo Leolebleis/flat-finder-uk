@@ -29,6 +29,8 @@ services:
       # MCP endpoint of a scrapling container reachable on pi-net, e.g.
       # http://gluetun:8001/mcp (set in .env); empty = fetch directly
       - SCRAPLING_MCP_URL=${SCRAPLING_MCP_URL:-}
+      # How often to re-notify about a source that is still failing; 0 disables
+      - SCRAPER_REALERT_HOURS=${SCRAPER_REALERT_HOURS:-24}
     networks:
       - default
       - pi-net
