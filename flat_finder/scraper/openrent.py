@@ -1,3 +1,4 @@
+import math
 import re
 from datetime import UTC, datetime
 from urllib.parse import quote_plus, urlencode
@@ -10,11 +11,24 @@ from flat_finder.scraping import HTMLFetcher, check_description, make_retry_sess
 BASE_URL = "https://www.openrent.co.uk/properties-to-rent"
 
 
-def build_search_url(location: str, radius_km: int, min_beds: int, max_beds: int, max_price: int) -> str:
+def snap_radius(radius_km: float) -> int:
+    """Round a radius up to whole km, the only granularity OpenRent's `within` accepts.
+
+    Rounds up for the same reason as the Rightmove adapter: results are
+    post-filtered against the zone polygon, so over-fetching is discarded
+    harmlessly while under-fetching drops listings genuinely inside the zone.
+
+    Floors at 1: OpenRent silently substitutes its own 2 km default for
+    `within=0`, so sending 0 would hand radius control to them.
+    """
+    return max(1, math.ceil(radius_km))
+
+
+def build_search_url(location: str, radius_km: float, min_beds: int, max_beds: int, max_price: int) -> str:
     """Build an OpenRent search URL from parameters."""
     params = {
         "term": location,
-        "within": radius_km,
+        "within": snap_radius(radius_km),
         "prices_min": 0,
         "prices_max": max_price,
         "bedrooms_min": min_beds,
@@ -188,7 +202,7 @@ def parse_openrent_html(html: str) -> list[dict]:
 
 def fetch_openrent(  # noqa: PLR0913
     location: str,
-    radius_km: int,
+    radius_km: float,
     min_beds: int,
     max_beds: int,
     max_price: int,

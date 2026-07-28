@@ -190,7 +190,6 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         for zone in all_zones:
             radius_km = zone.covering_radius_km or DEFAULT_ZONE_RADIUS_KM
             rm_radius_miles = radius_km / KM_PER_MILE
-            or_radius_km = int(radius_km)
 
             rm_listings, rm_error = _scrape_source(
                 f"rightmove/{zone.name}",
@@ -200,7 +199,7 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             )
             or_listings, or_error = _scrape_source(
                 f"openrent/{zone.name}",
-                lambda z=zone, r=or_radius_km: fetch_openrent(
+                lambda z=zone, r=radius_km: fetch_openrent(
                     z.openrent_term or "", r, search_min_beds, search_max_beds, search_max_rent, session=http_session
                 ),
             )
