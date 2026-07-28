@@ -193,6 +193,94 @@ class TestFetchCommutesForListings:
         assert dao.upsert.call_count == 2
 
 
+class TestMaxCallsBudget:
+    """Feature: cap the upstream requests a single pass may spend
+
+    The cap exists so commute lookups sitting in front of user notifications
+    cannot delay them without bound.
+    """
+
+    def _poi(self) -> POI:
+        return POI(id=1, user_id=1, name="Work", lat=51.54, lng=-0.17, color_index=0, created_at="now")
+
+    def _mock_client(self, return_value: int | None) -> Mock:
+        client = Mock()
+        client.journey_mins.return_value = return_value
+        return client
+
+    def test_caps_upstream_requests(self):
+        """Given more distinct coordinates than the budget
+        When fetch_commutes_for_listings runs with max_calls
+        Then only that many upstream requests are made."""
+        dao = Mock()
+        client = self._mock_client(25)
+        rows = [{"id": f"rm_{i}", "latitude": 51.5 + i / 1000, "longitude": -0.1} for i in range(10)]
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client, max_calls=3)
+        assert client.journey_mins.call_count == 3
+        assert dao.upsert.call_count == 3
+
+    def test_budget_counts_requests_not_listings(self):
+        """Given many listings that collapse onto few coordinates
+        When the budget is smaller than the listing count but not the coord count
+        Then all of them are fetched, because they cost only two requests.
+
+        A listing-denominated cap would have skipped most of these for no
+        latency saving.
+        """
+        dao = Mock()
+        client = self._mock_client(25)
+        rows = [{"id": f"rm_{i}", "latitude": 51.50000, "longitude": -0.10000} for i in range(9)]
+        rows.append({"id": "rm_other", "latitude": 51.60000, "longitude": -0.20000})
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client, max_calls=2)
+        assert client.journey_mins.call_count == 2
+        assert dao.upsert.call_count == 10  # every listing still gets a row
+
+    def test_never_splits_a_coordinate_group(self):
+        """Given a coordinate shared by several listings
+        When the budget cuts off mid-batch
+        Then the group is included whole or not at all.
+
+        A split group would leave siblings for the later backfill pass, which
+        would re-request the identical coordinate.
+        """
+        dao = Mock()
+        client = self._mock_client(25)
+        rows = [
+            {"id": "a1", "latitude": 51.50000, "longitude": -0.10000},
+            {"id": "a2", "latitude": 51.50000, "longitude": -0.10000},
+            {"id": "b1", "latitude": 51.60000, "longitude": -0.20000},
+        ]
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client, max_calls=1)
+        upserted = {call.args[0] for call in dao.upsert.call_args_list}
+        assert upserted == {"a1", "a2"}, "the whole first coordinate, and nothing from the second"
+
+    def test_zero_budget_makes_no_requests(self):
+        """Given a zero budget
+        When fetch_commutes_for_listings runs
+        Then nothing is fetched or upserted."""
+        dao = Mock()
+        client = self._mock_client(25)
+        rows = [{"id": "rm_1", "latitude": 51.5, "longitude": -0.1}]
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client, max_calls=0)
+        assert client.journey_mins.call_count == 0
+        assert dao.upsert.call_count == 0
+
+    def test_no_budget_fetches_everything(self):
+        """Given max_calls is not supplied
+        When fetch_commutes_for_listings runs
+        Then behaviour is unchanged: every coordinate is queried."""
+        dao = Mock()
+        client = self._mock_client(25)
+        rows = [{"id": f"rm_{i}", "latitude": 51.5 + i / 1000, "longitude": -0.1} for i in range(4)]
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client)
+        assert client.journey_mins.call_count == 4
+
+
 class TestNoJourneySentinelReads:
     """Feature: sentinel rows are excluded from reads but stop the backfill"""
 

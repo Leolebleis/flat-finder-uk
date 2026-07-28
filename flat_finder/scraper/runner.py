@@ -203,22 +203,28 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         pois = poi_repo.get_all()
         commute_client = TransitousCommuteClient()
 
-        # Fetch commute times for new listings (per POI), committing per upsert
+        # Fetch commute times for new listings (per POI), committing per upsert.
+        # Budgeted: every lookup is a rate-limited upstream call that can block for
+        # seconds, and this sits in front of the notifications. Fetching the whole
+        # batch once held every alert for ~100 minutes (134 listings x 4 POIs).
+        # Whatever the budget doesn't cover is picked up by the backfill below,
+        # which now runs after the pushes have gone out.
         if new_listings and pois:
             rows = [
                 {"id": listing["id"], "latitude": listing["latitude"], "longitude": listing["longitude"]}
                 for listing in new_listings
                 if listing.get("latitude") and listing.get("longitude")
             ]
+            calls_per_poi = config.COMMUTE_PRENOTIFY_CALLS // len(pois)
             for poi in pois:
-                fetch_commutes_for_listings(poi_commute_repo, poi, rows, commute_client, after_upsert=session.commit)
-
-        # Backfill: any listings still missing commute data for any POI
-        for poi in pois:
-            missing = poi_commute_repo.get_listings_missing_poi(poi.id)
-            if missing:
-                log.info("Backfilling '%s' commute for %d listings", poi.name, len(missing))
-                fetch_commutes_for_listings(poi_commute_repo, poi, missing, commute_client, after_upsert=session.commit)
+                fetch_commutes_for_listings(
+                    poi_commute_repo,
+                    poi,
+                    rows,
+                    commute_client,
+                    after_upsert=session.commit,
+                    max_calls=calls_per_poi,
+                )
 
         # Attach poi_commutes to new listings for notification (one batched query)
         if new_listings:
@@ -267,6 +273,15 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
 
         # User-facing work is done — persist it before the maintenance phase
         session.commit()
+
+        # Backfill: any listings still missing commute data for any POI. Runs after
+        # notifications so its rate-limited lookups never delay an alert; the data
+        # lands in the UI within the cycle either way.
+        for poi in pois:
+            missing = poi_commute_repo.get_listings_missing_poi(poi.id)
+            if missing:
+                log.info("Backfilling '%s' commute for %d listings", poi.name, len(missing))
+                fetch_commutes_for_listings(poi_commute_repo, poi, missing, commute_client, after_upsert=session.commit)
 
         # Archive listings older than the retention window. Runs last, in its
         # own commit scope, so an archiving failure can only ever lose the
