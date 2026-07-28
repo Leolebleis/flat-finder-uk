@@ -6,18 +6,16 @@ from typing import Any
 
 from shapely.geometry import Point, shape
 from shapely.prepared import prep
-from sqlalchemy.orm import Session
 
 from flat_finder import config
 from flat_finder.database import get_engine, get_session
-from flat_finder.listings.persistence import ListingRepository, ListingStateRepository, ScraperStateDB
+from flat_finder.listings.persistence import ListingRepository, ListingStateRepository
 from flat_finder.pois.persistence import POICommuteRepository, POIRepository
 from flat_finder.scraper.commute import fetch_commutes_for_listings
+from flat_finder.scraper.health import get_scraper_state, handle_source_health, set_scraper_state
 from flat_finder.scraper.notifier import (
     format_email_html,
-    format_failure_message,
     format_ntfy_single,
-    format_recovery_message,
     send_email,
     send_ntfy,
 )
@@ -93,48 +91,6 @@ def _filter_listings_by_zone(listings: list[dict[str, Any]], zone_geometry: str 
     ]
 
 
-def _get_scraper_state(session: Session, key: str) -> str | None:
-    row = session.get(ScraperStateDB, key)
-    return row.value if row else None
-
-
-def _set_scraper_state(session: Session, key: str, value: str) -> None:
-    row = session.get(ScraperStateDB, key)
-    if row is None:
-        row = ScraperStateDB(key=key, value=value)
-        session.add(row)
-    else:
-        row.value = value
-    session.flush()
-
-
-def _delete_scraper_state(session: Session, key: str) -> None:
-    row = session.get(ScraperStateDB, key)
-    if row:
-        session.delete(row)
-        session.flush()
-
-
-def _handle_failure_state(
-    session: Session,
-    ntfy_topic: str | None,
-    source: str,
-    error: str | None,
-) -> None:
-    state_key = f"{source}_failing"
-    was_failing = _get_scraper_state(session, state_key) is not None
-    if error and not was_failing:
-        _set_scraper_state(session, state_key, error)
-        if ntfy_topic:
-            title, body = format_failure_message(source, error)
-            _notify_safe(send_ntfy, ntfy_topic, title, body)
-    elif not error and was_failing:
-        _delete_scraper_state(session, state_key)
-        if ntfy_topic:
-            title, body = format_recovery_message(source)
-            _notify_safe(send_ntfy, ntfy_topic, title, body)
-
-
 def run() -> None:  # noqa: C901, PLR0912, PLR0915
     engine = get_engine(config.DB_PATH)
     Session = get_session(engine)  # noqa: N806
@@ -149,7 +105,7 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         poi_commute_repo = POICommuteRepository(session)
         user_repo = UserRepository(session)
 
-        first_run = _get_scraper_state(session, "initialised") is None
+        first_run = get_scraper_state(session, "initialised") is None
 
         all_zones = zone_repo.get_all()
 
@@ -190,7 +146,6 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
         for zone in all_zones:
             radius_km = zone.covering_radius_km or DEFAULT_ZONE_RADIUS_KM
             rm_radius_miles = radius_km / KM_PER_MILE
-            or_radius_km = int(radius_km)
 
             rm_listings, rm_error = _scrape_source(
                 f"rightmove/{zone.name}",
@@ -200,13 +155,13 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
             )
             or_listings, or_error = _scrape_source(
                 f"openrent/{zone.name}",
-                lambda z=zone, r=or_radius_km: fetch_openrent(
+                lambda z=zone, r=radius_km: fetch_openrent(
                     z.openrent_term or "", r, search_min_beds, search_max_beds, search_max_rent, session=http_session
                 ),
             )
 
-            _handle_failure_state(session, health_ntfy_topic, f"rightmove/{zone.name}", rm_error)
-            _handle_failure_state(session, health_ntfy_topic, f"openrent/{zone.name}", or_error)
+            handle_source_health(session, health_ntfy_topic, f"rightmove/{zone.name}", rm_error)
+            handle_source_health(session, health_ntfy_topic, f"openrent/{zone.name}", or_error)
 
             # Post-filter by polygon
             combined = _filter_listings_by_zone(rm_listings + or_listings, zone.geometry)
@@ -272,7 +227,7 @@ def run() -> None:  # noqa: C901, PLR0912, PLR0915
                 listing["poi_commutes"] = commutes.get(listing["id"], {})
 
         if first_run:
-            _set_scraper_state(session, "initialised", "true")
+            set_scraper_state(session, "initialised", "true")
             log.info("First run: found %d existing listings", len(all_listings))
             if health_ntfy_topic:
                 _notify_safe(
