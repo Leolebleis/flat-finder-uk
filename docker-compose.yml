@@ -31,6 +31,8 @@ services:
       - SCRAPLING_MCP_URL=${SCRAPLING_MCP_URL:-}
       # How often to re-notify about a source that is still failing; 0 disables
       - SCRAPER_REALERT_HOURS=${SCRAPER_REALERT_HOURS:-24}
+      # Commute API requests spent enriching new listings before notifying; 0 disables
+      - COMMUTE_PRENOTIFY_CALLS=${COMMUTE_PRENOTIFY_CALLS:-40}
     networks:
       - default
       - pi-net

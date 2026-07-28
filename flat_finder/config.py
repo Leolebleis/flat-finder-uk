@@ -26,5 +26,11 @@ SCRAPLING_MCP_URL = get_env("SCRAPLING_MCP_URL")
 # re-alerts (first-failure and recovery pushes always fire).
 SCRAPER_REALERT_HOURS = float(get_env("SCRAPER_REALERT_HOURS", "24"))
 
+# Upstream commute lookups to spend enriching new listings before notifications
+# go out; the rest are backfilled afterwards. Budgeted in requests, not
+# listings, because the cost is one request per distinct coordinate per POI.
+# 0 sends notifications without commute times.
+COMMUTE_PRENOTIFY_CALLS = max(0, int(get_env("COMMUTE_PRENOTIFY_CALLS", "40")))
+
 # Security
 SECRET_KEY = get_env("SECRET_KEY", "dev-secret-change-in-production")
