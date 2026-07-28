@@ -159,6 +159,39 @@ class TestFetchCommutesForListings:
             fetch_commutes_for_listings(dao, self._poi(), rows, client, after_upsert=hook)
         assert hook.call_count == 2
 
+    def test_shared_coordinate_queries_api_once_but_upserts_all(self):
+        """Given several listings sharing a coordinate (to ~1m)
+        When fetch_commutes_for_listings runs
+        Then the commute API is queried once per distinct coordinate,
+        but every listing still gets its own upserted row."""
+        dao = Mock()
+        client = self._mock_client(25)
+        rows = [
+            {"id": "rm_1", "latitude": 51.50000, "longitude": -0.10000},
+            {"id": "rm_2", "latitude": 51.500004, "longitude": -0.100002},  # same coord at 5dp
+            {"id": "rm_3", "latitude": 51.60000, "longitude": -0.20000},  # distinct
+        ]
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client)
+        assert client.journey_mins.call_count == 2  # one per distinct coordinate
+        assert dao.upsert.call_count == 3  # one per listing
+        dao.upsert.assert_any_call("rm_2", 1, 25)  # shared-coord listing still upserted
+
+    def test_shared_coordinate_no_journey_fans_out_to_all(self):
+        """Given listings sharing an unroutable coordinate
+        When the single query returns NO_JOURNEY
+        Then every co-located listing gets the sentinel (one API call)."""
+        dao = Mock()
+        client = self._mock_client(NO_JOURNEY)
+        rows = [
+            {"id": "rm_1", "latitude": 50.82176, "longitude": -0.14370},
+            {"id": "rm_2", "latitude": 50.82176, "longitude": -0.14370},
+        ]
+        with patch("flat_finder.scraper.commute.time.sleep"):
+            fetch_commutes_for_listings(dao, self._poi(), rows, client)
+        assert client.journey_mins.call_count == 1
+        assert dao.upsert.call_count == 2
+
 
 class TestNoJourneySentinelReads:
     """Feature: sentinel rows are excluded from reads but stop the backfill"""
