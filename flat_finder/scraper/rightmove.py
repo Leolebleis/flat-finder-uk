@@ -14,6 +14,12 @@ log = logging.getLogger("flat-finder")
 SEARCH_URL = "https://www.rightmove.co.uk/property-to-rent/find.html"
 PAGE_SIZE = 24
 
+# Rightmove validates `radius` against this fixed set of miles; anything else
+# redirects to /page-not-found, whose HTML carries no __NEXT_DATA__. Passing a
+# computed float silently broke every zone from 2026-07-20.
+# Must stay ascending: snap_radius takes the first match as the smallest fit.
+ALLOWED_RADII = (0.0, 0.25, 0.5, 1.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0)
+
 FURNISH_PATTERNS = [
     (r"\bunfurnished\b", "Unfurnished"),
     (r"\bpart[- ]?furnished\b", "Part furnished"),
@@ -21,12 +27,22 @@ FURNISH_PATTERNS = [
 ]
 
 
+def snap_radius(radius: float) -> float:
+    """Round a radius up to the nearest value Rightmove accepts.
+
+    Rounds up rather than to nearest: the caller post-filters results against the
+    zone polygon, so over-fetching is discarded harmlessly while under-fetching
+    would drop listings that are genuinely inside the zone.
+    """
+    return next((allowed for allowed in ALLOWED_RADII if allowed >= radius), ALLOWED_RADII[-1])
+
+
 def build_search_url(  # noqa: PLR0913
     location_id: str, radius: float, min_beds: int, max_beds: int, max_price: int, index: int = 0
 ) -> str:
     params = {
         "locationIdentifier": location_id,
-        "radius": radius,
+        "radius": snap_radius(radius),
         "minBedrooms": min_beds,
         "maxBedrooms": max_beds,
         "maxPrice": max_price,
