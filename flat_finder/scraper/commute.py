@@ -30,25 +30,41 @@ class CommuteClient(Protocol):
         ...
 
 
-def fetch_commutes_for_listings(
+def fetch_commutes_for_listings(  # noqa: PLR0913
     commute_dao: POICommuteDAO,
     poi: POI,
     rows: list[dict[str, Any]],
     commute_client: CommuteClient,
     after_upsert: Callable[[], None] | None = None,
+    max_calls: int | None = None,
 ) -> None:
     """Fetch commutes for the given listings and upsert results. Throttled.
 
     Listings sharing a coordinate (rounded to ~1m) are queried once and the
     result reused for all of them, cutting redundant calls to the upstream
     service. Each listing still gets its own row.
+
+    `max_calls` caps the upstream requests made here. It is applied after
+    grouping, so the cap counts real requests rather than listings, and a
+    coordinate is never split across the boundary — callers that defer the
+    remainder to a later pass would otherwise re-request the same coordinate.
     """
     groups: dict[tuple[float, float], list[dict[str, Any]]] = {}
     for row in rows:
         key = (round(row["latitude"], _COORD_PRECISION), round(row["longitude"], _COORD_PRECISION))
         groups.setdefault(key, []).append(row)
 
-    for group in groups.values():
+    selected = list(groups.values())
+    if max_calls is not None and len(selected) > max_calls:
+        log.info(
+            "Commute prefetch for '%s' capped at %d of %d coordinates; rest deferred to backfill",
+            poi.name,
+            max_calls,
+            len(selected),
+        )
+        selected = selected[:max_calls]
+
+    for group in selected:
         head = group[0]
         mins = commute_client.journey_mins(head["latitude"], head["longitude"], poi.lat, poi.lng)
         if mins is None:

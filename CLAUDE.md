@@ -36,6 +36,7 @@ Design docs: `docs/2026-03-07-flat-finder-poi-design.md`, `docs/2026-03-07-drawa
 - `GMAIL_ADDRESS` / `GMAIL_APP_PASSWORD` -- optional, for email notifications.
 - `SCRAPLING_MCP_URL` -- optional; routes Rightmove fetches through a scrapling MCP container (Chrome TLS fingerprint, avoids WAF bot-checks). On the Pi set to `http://gluetun:8001/mcp` in `.env` (scraper is on pi-net). Empty = direct fetches. Never route OpenRent through it: its AWS WAF blocks VPN/datacenter IPs.
 - `SCRAPER_REALERT_HOURS` -- optional; how often to re-notify about a source that is still failing (default 24, `0` disables). Failure alerts are otherwise edge-triggered, so a permanently broken source would alert once and then look identical to a healthy one.
+- `COMMUTE_PRENOTIFY_CALLS` -- optional; commute API requests spent enriching new listings before notifications are sent (default 40, `0` sends with no commute times). Budgeted in requests, not listings, because the cost is one request per distinct coordinate **per POI** — the budget is divided across POIs. The remainder is backfilled after the pushes go out.
 - Rent/bedroom env vars are scraper fallbacks; per-user search params (set in Settings) take precedence.
 
 ## Key commands
